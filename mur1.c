@@ -80,7 +80,7 @@ int id_mem;             /* identificador de la memòria compartida creada */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
 /* Variables de temps */
-int segons, minuts;
+int milisegons = 0, segons = 0, minuts = 0;
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -251,29 +251,66 @@ int mou_paleta(void)
 	return (result);
 }
 
+void actualitza_temps(void)
+{
+	milisegons = milisegons + retard;
+	if (milisegons >= 1000) {
+		milisegons -= 1000;
+		segons++;
+		if (segons >= 60) {
+			segons = 0;
+			minuts++;
+		}
+	}
+	char temps[20];
+	sprintf(temps, "%02d:%02d", minuts, segons);
+	win_escristr(temps);
+}
+
 /* --- Programa Principal --- */
 int main(int n_args, char *ll_args[])
 {
-	int fi1, fi2;
-	char* id_mem_s;
-	char* n_fil_s;
-	char* n_col_s;
-	char* pos_f_s;
-	char* pos_c_s;
-	char* vel_f_s;
-	char* vel_c_s;
-	char* retard_s;
-	sprintf(id_mem_s, "%d", id_mem);
-	sprintf(n_fil_s, "%d", n_fil);
-	sprintf(n_col_s, "%d", n_col);
-	sprintf(pos_f_s, "%f", pos_f);
-	sprintf(pos_c_s, "%f", pos_c);
-	sprintf(vel_f_s, "%f", vel_f);
-	sprintf(vel_c_s, "%f", vel_c);
-	sprintf(retard_s, "%d", retard);
-	/* 1. Inicialització de memòria compartida i curses */
+	int i, fi1 = 0, fi2 = 0;
+	char id_mem_s[20], n_fil_s[20], n_col_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], retard_s[20];
+	FILE *fit_conf;
+
+    /* 1. Comprovació d'arguments d'entrada */
+	if ((n_args != 2) && (n_args != 3)) {
+		i = 0;
+		do fprintf(stderr, "%s", descripcio[i++]);
+		while (descripcio[i][0] != '*');
+		exit(1);
+	}
+
+	fit_conf = fopen(ll_args[1], "rt");
+	if (!fit_conf) {
+		fprintf(stderr, "Error: no s'ha pogut obrir el fitxer \'%s\'\n", ll_args[1]);
+		exit(2);
+	}
+
+    /* 2. Càrrega del fitxer i configuració del retard del joc */
+	if (carrega_configuracio(fit_conf) != 0) exit(3);
+
+	if (n_args == 3) {
+		retard = atoi(ll_args[2]);
+		if (retard < 10) retard = 10;
+		if (retard > 1000) retard = 1000;
+	} else retard = 100;
+
+	printf("Joc del Mur: prem RETURN per continuar:\n");
+	getchar();
+
+	/* 3. Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
-	/* 2. Creació del procés fill per a la pilota */
+    	sprintf(id_mem_s, "%d", id_mem);
+       	sprintf(n_fil_s, "%d", n_fil);
+       	sprintf(n_col_s, "%d", n_col);
+       	sprintf(pos_f_s, "%f", pos_f);
+       	sprintf(pos_c_s, "%f", pos_c);
+       	sprintf(vel_f_s, "%f", vel_f);
+       	sprintf(vel_c_s, "%f", vel_c);
+       	sprintf(retard_s, "%d", retard);
+	/* 4. Creació del procés fill per a la pilota */
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
@@ -282,11 +319,12 @@ int main(int n_args, char *ll_args[])
 	}
 	do
 	{
-		/* 3. Bucle de gestió (Pare) */
+		/* 5. Bucle de gestió (Pare) */
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 	} while (!fi1 && !fi2);
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
 	/* Refresc visual (propi de winsuport2) */
 	win_fi();
+	elim_mem(id_mem);
 }
