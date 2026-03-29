@@ -94,7 +94,7 @@ void mostra_final(char *miss)
 }
 
 /* Prototipus de funcions */
-void comprovar_bloc(int f, int c);
+char comprovar_bloc(int f, int c);
 float control_impacte2(int c_pil, float velc0, int c_pal, int m_pal);
 int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float vel_f, float vel_c, char ball_id);
 
@@ -125,7 +125,7 @@ char comprovar_bloc(int f, int c)
         }
         
         /* Només decrementem el comptador si és un bloc trencable (A o B) */
-        if (quin == BLKCHAR || quin == 'B') {
+        if (quin == BLKCHAR || quin == FRNTCHAR) {
             nblocs--; /* Decrementem el total de blocs pendents */
         }
         /* Nota: Si és FRNTCHAR ('A'), no decrementem nblocs perquè no és trencable? */
@@ -138,7 +138,7 @@ char comprovar_bloc(int f, int c)
 /* * Crea un nou procés pilota en la posició indicada amb la velocitat invertida.
  * Retorna 0 si s'ha creat correctament, -1 si hi ha error.
  */
-int crear_nova_pilota(int f_bloc, int c_bloc, float vel_f, float vel_c, int retard)
+int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard)
 {
     pid_t pid;
     char id_mem_str[20], n_fil_str[20], n_col_str[20], m_por_str[20];
@@ -251,9 +251,9 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     tipus_bloc = comprovar_bloc(f_h, c_pil);
                     
                     /* Si és bloc 'B', crear nova pilota */
-                    if (tipus_bloc == 'B') {
+                    if (tipus_bloc == BLKCHAR) {
                         /* Crear nova pilota a la posició del bloc amb velocitat invertida */
-                        crear_nova_pilota(f_h, c_pil, vel_f, vel_c, retard);
+                        crear_nova_pilota(f_h, c_pil, c_pal, m_pal, vel_f, vel_c, retard);
                     }
                     
                     if (rv == '0') 
@@ -269,8 +269,8 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                 if (rh != ' ') {
                     tipus_bloc = comprovar_bloc(f_pil, c_h);
                     
-                    if (tipus_bloc == 'B') {
-                        crear_nova_pilota(f_pil, c_h, vel_f, vel_c, retard);
+                    if (tipus_bloc == BLKCHAR) {
+                        crear_nova_pilota(f_pil, c_h, c_pal, m_pal, vel_f, vel_c, retard);
                     }
                     
                     vel_c = -vel_c;
@@ -284,8 +284,8 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                 if (rd != ' ') {
                     tipus_bloc = comprovar_bloc(f_h, c_h);
                     
-                    if (tipus_bloc == 'B') {
-                        crear_nova_pilota(f_h, c_h, vel_f, vel_c, retard);
+                    if (tipus_bloc == BLKCHAR) {
+                        crear_nova_pilota(f_h, c_h, c_pal, m_pal, vel_f, vel_c, retard);
                     }
                     
                     vel_f = -vel_f;
@@ -332,11 +332,12 @@ int main(int n_args, char *ll_args[])
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
     
-    /* Comprovació d'arguments: esperem 11 arguments */
+    /* Comprovació d'arguments: esperem 13 arguments */
     /* Format: id_mem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
-    if (n_args != 12) {
+    if (n_args != 14) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
         fprintf(stderr, "Ús: pilota1 id_mem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard\n");
+        fprintf(stderr, "Arguments detectats: %d", n_args);
         exit(1);
     }
     
@@ -375,8 +376,6 @@ int main(int n_args, char *ll_args[])
     
     /* Alliberar recursos (no cal win_fi() perquè només el pare ho fa) */
     /* Nota: no es fa elim_mem() perquè el pare és qui gestiona la memòria */
-    
-    return 0;
 
 	return (0);
 }

@@ -2,7 +2,7 @@
 # Compilació dels programes mur0, mur1 i pilota1
 
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -fpermissive
 LIBS = -lcurses
 
 # Objectius principals (es compilen tots si fem 'make' a seques)

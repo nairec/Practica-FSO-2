@@ -271,7 +271,8 @@ void actualitza_temps(void)
 int main(int n_args, char *ll_args[])
 {
 	int i, fi1 = 0, fi2 = 0;
-	char id_mem_s[20], n_fil_s[20], n_col_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], retard_s[20];
+	int ball_id = 0; // ball_id hauria de ser únic
+	char id_mem_s[20], n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
 	FILE *fit_conf;
 
     /* 1. Comprovació d'arguments d'entrada */
@@ -305,16 +306,21 @@ int main(int n_args, char *ll_args[])
     	sprintf(id_mem_s, "%d", id_mem);
        	sprintf(n_fil_s, "%d", n_fil);
        	sprintf(n_col_s, "%d", n_col);
+		sprintf(m_por_s, "%d", m_por);
+		sprintf(f_pal_s, "%d", f_pal);
+		sprintf(c_pal_s, "%d", c_pal);
+		sprintf(m_pal_s, "%d", m_pal);
        	sprintf(pos_f_s, "%f", pos_f);
        	sprintf(pos_c_s, "%f", pos_c);
        	sprintf(vel_f_s, "%f", vel_f);
        	sprintf(vel_c_s, "%f", vel_c);
+		sprintf(ball_id_s, "%d", ball_id);
        	sprintf(retard_s, "%d", retard);
 	/* 4. Creació del procés fill per a la pilota */
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota1", "pilota1", id_mem_s, n_fil_s, n_col_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, retard_s, (char *)NULL);
+		execlp("./pilota1", "pilota1", id_mem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
 		exit(1);
 	}
 	do
