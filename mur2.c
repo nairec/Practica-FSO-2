@@ -12,6 +12,7 @@
 #include <string.h>
 #include "winsuport2.h"
 #include "memoria.h"
+#include "semafor.h"
 
 /* --- Definicions de constants --- */
 #define MAX_THREADS	10
@@ -230,21 +231,24 @@ void mostra_final(char *miss)
 int mou_paleta(void)
 {
 	int tecla, result;
-
 	result = 0;
 	tecla = win_gettec();
 	if (tecla != 0) {
 		if ((tecla == TEC_DRETA) && ((c_pal + m_pal) < n_col - 1)) {
+		    	waitS(id_sem);
                 /* Esborrar l'extrem esquerre i pintar el nou extrem dret */
 				win_escricar(f_pal, c_pal, ' ', NO_INV);
 				c_pal++;
 				win_escricar(f_pal, c_pal + m_pal - 1, '0', INVERS);
+				signalS(id_sem);
 		}
 		if ((tecla == TEC_ESQUER) && (c_pal > 1)) {
+		    	waitS(id_sem);
                 /* Esborrar l'extrem dret i pintar el nou extrem esquerre */
 				win_escricar(f_pal, c_pal + m_pal - 1, ' ', NO_INV);
 				c_pal--;
 				win_escricar(f_pal, c_pal, '0', INVERS);
+				signalS(id_sem);
 		}
 		if (tecla == TEC_RETURN) result = 1; /* L'usuari vol sortir */
 		dirPaleta = tecla;
@@ -265,7 +269,9 @@ void actualitza_temps(void)
 	}
 	char temps[20];
 	sprintf(temps, "%02d:%02d", minuts, segons);
+	waitS(id_sem);
 	win_escristr(temps);
+	signalS(id_sem);
 }
 
 /* --- Programa Principal --- */
@@ -326,7 +332,7 @@ int main(int n_args, char *ll_args[])
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota1", "pilota1", id_mem_s, id_sem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
 		exit(1);
 	}
 	do
@@ -337,6 +343,9 @@ int main(int n_args, char *ll_args[])
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
 	/* Refresc visual (propi de winsuport2) */
+	mostra_final("Partida finalitzada");
 	win_fi();
 	elim_mem(id_mem);
+	elim_sem(id_sem);
+	// Falta elim_mis(id_mis);
 }

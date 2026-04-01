@@ -15,6 +15,9 @@ winsuport2.o: winsuport2.c winsuport2.h
 memoria.o: memoria.c memoria.h
 	$(CC) $(CFLAGS) -c memoria.c -o memoria.o
 
+semafor.o: semafor.c semafor.h
+	$(CC) $(CFLAGS) -c semafor.c -o semafor.o
+
 # --- FASE 0 ---
 mur0.o: mur0.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c mur0.c -o mur0.o
@@ -32,10 +35,23 @@ mur1: mur1.o winsuport2.o memoria.o
 pilota1.o: pilota1.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c pilota1.c -o pilota1.o
 
-pilota1: pilota1.o winsuport2.o memoria.o
-	$(CC) $(CFLAGS) pilota1.o winsuport2.o memoria.o -o pilota1 $(LIBS)
+pilota2: pilota2.o winsuport2.o memoria.o
+	$(CC) $(CFLAGS) pilota2.o winsuport2.o memoria.o -o pilota2 $(LIBS)
+
+# --- FASE 2 ---
+mur2.o: mur2.c winsuport2.h memoria.h
+	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
+
+mur2: mur2.o winsuport2.o memoria.o
+	$(CC) $(CFLAGS) mur2.o winsuport2.o memoria.o semafor.o -o mur2 $(LIBS)
+
+pilota2.o: pilota2.c winsuport2.h memoria.h
+	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
+
+pilota2: pilota2.o winsuport2.o memoria.o
+	$(CC) $(CFLAGS) pilota2.o winsuport2.o memoria.o semafor.o -o pilota2 $(LIBS)
 
 # --- Neteja ---
 # Executar 'make clean' per esborrar els binaris i fitxers objecte
 clean:
-	rm -f *.o mur0 mur1 pilota1
+	rm -f *.o mur0 mur1 mur2 pilota1 pilota2

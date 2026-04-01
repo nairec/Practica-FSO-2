@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include "winsuport2.h"
 #include "memoria.h"
+#include "semafor.h"
 
 /* --- Definicions de constants --- */
 //#define MAX_THREADS	10 [maxim de fils] No fa falta perque a pilota1 no es creen fils (threads), nomes processos
@@ -76,24 +77,6 @@ int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
-/* * Mostra el missatge final de partida a la línia d'estat i espera a que
- * l'usuari premi una tecla per tancar l'aplicació.
- */
-void mostra_final(char *miss)
-{
-	int lmarge;
-	char marge[LONGMISS];
-
-    /* Centra el text calculant el marge necessari */
-	lmarge=(n_col+strlen(miss))/2;
-	sprintf(marge,"%%%ds",lmarge);
-
-	sprintf(strin, marge,miss);
-	win_escristr(strin);
-	win_update();
-	getchar();
-}
-
 /* Prototipus de funcions */
 char comprovar_bloc(int f, int c);
 float control_impacte2(int c_pil, float velc0, int c_pal, int m_pal);
@@ -104,6 +87,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
  */
 char comprovar_bloc(int f, int c)
 {
+    waitS(id_sem);
 	int col;
 	char quin = win_quincar(f, c);
 	char tipus_bloc = ' ';
@@ -133,6 +117,7 @@ char comprovar_bloc(int f, int c)
         /* Segons l'enunciat, 'A' també es trenca, així que cal revisar la definició */
     }
 
+    signalS(id_sem);
     return tipus_bloc;  /* Retornem el tipus de bloc ('A', 'B', '#', etc.) */
 }
 
@@ -247,6 +232,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 
 			/* Comprovar rebot vertical (sostre, paleta, o bloc a dalt/baix) */
 			if (f_h != f_pil) {
+               	waitS(id_sem);
                 rv = win_quincar(f_h, c_pil);
                 if (rv != ' ') {
                     tipus_bloc = comprovar_bloc(f_h, c_pil);
@@ -262,10 +248,12 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     vel_f = -vel_f;
                     f_h = pos_f + vel_f;
                 }
+                signalS(id_sem);
             }
 
 			/* Comprovar rebot horitzontal (parets laterals o costats dels blocs) */
 			if (c_h != c_pil) {
+			    waitS(id_sem);
                 rh = win_quincar(f_pil, c_h);
                 if (rh != ' ') {
                     tipus_bloc = comprovar_bloc(f_pil, c_h);
@@ -277,10 +265,12 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     vel_c = -vel_c;
                     c_h = pos_c + vel_c;
                 }
+                signalS(id_sem);
             }
 
 			/* Comprovar rebot diagonal (caires de les estructures) */
 			if ((f_h != f_pil) && (c_h != c_pil)) {
+                waitS(id_sem);
                 rd = win_quincar(f_h, c_h);
                 if (rd != ' ') {
                     tipus_bloc = comprovar_bloc(f_h, c_h);
@@ -294,9 +284,11 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     f_h = pos_f + vel_f;
                     c_h = pos_c + vel_c;
                 }
+                signalS(id_sem);
             }
 
 			/* Si l'espai està lliure, moure la pilota i redibuixar */
+			waitS(id_sem);
 			if (win_quincar(f_h, c_h) == ' ') {
 				win_escricar(f_pil, c_pil, ' ', NO_INV);
 				pos_f += vel_f;
@@ -308,6 +300,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 				if (f_pil != n_fil - 1) win_escricar(f_pil, c_pil, ball_id, INVERS);
 				else fora = 1;
 			}
+			signalS(id_sem);
 		} else {
 			/* Encara que no canviï de quadrat a la pantalla, actualitzem coordenades reals */
 			pos_f += vel_f;
@@ -321,8 +314,10 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
         win_retard(retard);
     }
 
+    waitS(id_sem);
     /* Netejar la pilota de la pantalla abans de sortir */
     win_escricar(f_pil, c_pil, ' ', NO_INV);
+    signalS(id_sem);
     return 1;  /* La pilota ha sortit */
 }
 
@@ -378,6 +373,7 @@ int main(int n_args, char *ll_args[])
 
     /* Alliberar recursos (no cal win_fi() perquè només el pare ho fa) */
     /* Nota: no es fa elim_mem() perquè el pare és qui gestiona la memòria */
+    elim_sem(id_sem);
 
 	return (0);
 }
