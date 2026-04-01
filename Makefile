@@ -42,8 +42,33 @@ mur1: mur1.o winsuport2.o memoria.o
 pilota1.o: pilota1.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c pilota1.c -o pilota1.o
 
-pilota1: pilota1.o winsuport2.o memoria.o
-	$(CC) $(CFLAGS) pilota1.o winsuport2.o memoria.o -o pilota1 $(LIBS)
+# --- FASE 2 ---
+mur2.o: mur2.c winsuport2.h memoria.h
+	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
+
+mur2: mur2.o winsuport2.o memoria.o semafor.o
+	$(CC) $(CFLAGS) mur2.o winsuport2.o memoria.o semafor.o -o mur2 $(LIBS)
+
+pilota2.o: pilota2.c winsuport2.h memoria.h
+	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
+
+pilota2: pilota2.o winsuport2.o memoria.o semafor.o
+	$(CC) $(CFLAGS) pilota2.o winsuport2.o memoria.o semafor.o -o pilota2 $(LIBS)
+
+# --------- FASE 2
+mur2.o: mur2.c winsuport2.h memoria.h semafor.h bustia.h
+	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
+
+mur2: mur2.o $(OBJS_COMUNES)
+	$(CC) -o mur2 mur2.o $(OBJS_COMUNES) $(LDFLAGS)
+
+pilota2.o: pilota2.c winsuport2.h memoria.h semafor.h bustia.h
+	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
+
+pilota2: pilota2.o $(OBJS_COMUNES)
+	$(CC) -o pilota2 pilota2.o $(OBJS_COMUNES) $(LDFLAGS)
+
+# ------------
 
 # --------- FASE 2
 mur2.o: mur2.c winsuport2.h memoria.h semafor.h bustia.h

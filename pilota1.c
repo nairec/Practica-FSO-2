@@ -75,24 +75,6 @@ char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla 
 int id_mem;             /* identificador de la memòria compartida creada */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
-/* * Mostra el missatge final de partida a la línia d'estat i espera a que
- * l'usuari premi una tecla per tancar l'aplicació.
- */
-void mostra_final(char *miss)
-{
-	int lmarge;
-	char marge[LONGMISS];
-
-    /* Centra el text calculant el marge necessari */
-	lmarge=(n_col+strlen(miss))/2;
-	sprintf(marge,"%%%ds",lmarge);
-
-	sprintf(strin, marge,miss);
-	win_escristr(strin);
-	win_update();
-	getchar();
-}
-
 /* Prototipus de funcions */
 char comprovar_bloc(int f, int c);
 float control_impacte2(int c_pil, float velc0, int c_pal, int m_pal);

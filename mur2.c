@@ -12,6 +12,7 @@
 #include <string.h>
 #include "winsuport2.h"
 #include "memoria.h"
+#include "semafor.h"
 #include "bustia.h"
 
 /* --- Definicions de constants --- */
@@ -232,21 +233,24 @@ void mostra_final(char *miss)
 int mou_paleta(void)
 {
 	int tecla, result;
-
 	result = 0;
 	tecla = win_gettec();
 	if (tecla != 0) {
 		if ((tecla == TEC_DRETA) && ((c_pal + m_pal) < n_col - 1)) {
+		    	waitS(id_sem);
                 /* Esborrar l'extrem esquerre i pintar el nou extrem dret */
 				win_escricar(f_pal, c_pal, ' ', NO_INV);
 				c_pal++;
 				win_escricar(f_pal, c_pal + m_pal - 1, '0', INVERS);
+				signalS(id_sem);
 		}
 		if ((tecla == TEC_ESQUER) && (c_pal > 1)) {
+		    	waitS(id_sem);
                 /* Esborrar l'extrem dret i pintar el nou extrem esquerre */
 				win_escricar(f_pal, c_pal + m_pal - 1, ' ', NO_INV);
 				c_pal--;
 				win_escricar(f_pal, c_pal, '0', INVERS);
+				signalS(id_sem);
 		}
 		if (tecla == TEC_RETURN) result = 1; /* L'usuari vol sortir */
 		dirPaleta = tecla;
@@ -267,7 +271,9 @@ void actualitza_temps(void)
 	}
 	char temps[20];
 	sprintf(temps, "%02d:%02d", minuts, segons);
+	waitS(id_sem);
 	win_escristr(temps);
+	signalS(id_sem);
 }
 
 /* --- Programa Principal --- */
@@ -352,6 +358,7 @@ int main(int n_args, char *ll_args[])
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
 	/* Refresc visual (propi de winsuport2) */
+	mostra_final("Partida finalitzada");
 	win_fi();
 	elim_mem(id_mem);
 	elim_sem(id_sem);

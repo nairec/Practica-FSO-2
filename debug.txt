@@ -1,0 +1,3 @@
+DEBUG Pilota 0: Mi id_sem es 12
+Pelota 0: vel_f=-0.500000, vel_c=0.500000
+pilota2: semafor.c:84: waitS: Assertion `r != -1' failed.

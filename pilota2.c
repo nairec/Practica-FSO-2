@@ -14,6 +14,7 @@
 #include "winsuport2.h"
 #include "memoria.h"
 #include "bustia.h"
+#include "semafor.h"
 
 /* --- Definicions de constants --- */
 //#define MAX_THREADS	10 [maxim de fils] No fa falta perque a pilota1 no es creen fils (threads), nomes processos
@@ -65,6 +66,8 @@ char *descripcio[] = {
 
 /* --- Variables Globals --- */
 
+char ball_id;
+
 /* Variables de l'entorn de joc (llegides des dels arguments) */
 int n_fil, n_col;		/* dimensions del camp de joc */
 int m_por;			    /* mida de la porteria (en caracters) */
@@ -110,8 +113,7 @@ char comprovar_bloc(int f, int c)
 	char quin = win_quincar(f, c);
 	char tipus_bloc = ' ';
 
-	/* Comprovar si és un bloc (qualsevol tipus) */
-    if (quin == BLKCHAR || quin == FRNTCHAR || quin == 'B') {
+    if (quin == BLKCHAR || quin == FRNTCHAR) {
         tipus_bloc = quin;  /* Guardem el tipus abans d'esborrar */
         col = c;
 
@@ -144,11 +146,11 @@ char comprovar_bloc(int f, int c)
 int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard)
 {
     pid_t pid;
-    char id_mem_str[20], n_fil_str[20], n_col_str[20], m_por_str[20];
+    char id_mem_str[20], id_sem_str[20], n_fil_str[20], n_col_str[20], m_por_str[20];
     char f_pal_str[20], c_pal_str[20], m_pal_str[20];
     char pos_f_str[20], pos_c_str[20], vel_f_str[20], vel_c_str[20];
     char retard_str[20], ball_id_str[5];
-    static int next_ball_id = 1;  /* Per assignar identificadors únics */
+    int next_ball_id = ball_id + 1;  /* Per assignar identificadors únics */
 
     /* Crear el nou procés */
     pid = fork();
@@ -163,6 +165,7 @@ int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f,
 
         /* Convertir paràmetres a strings */
         sprintf(id_mem_str, "%d", id_mem);
+        sprintf(id_sem_str, "%d", id_sem);
         sprintf(n_fil_str, "%d", n_fil);
         sprintf(n_col_str, "%d", n_col);
         sprintf(m_por_str, "%d", m_por);
@@ -191,10 +194,9 @@ int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f,
         } else {
             sprintf(ball_id_str, "%c", 'a' + (next_ball_id - 10));
         }
-        next_ball_id++;
 
         /* Executar el programa pilota1 */
-        execlp("./pilota1", "pilota1", id_mem_str, n_fil_str, n_col_str, m_por_str, f_pal_str, c_pal_str, m_pal_str, pos_f_str, pos_c_str, vel_f_str, vel_c_str,retard_str, ball_id_str, (char *)NULL);
+        execlp("./pilota2", "pilota2", id_mem_str, id_sem_str, n_fil_str, n_col_str, m_por_str, f_pal_str, c_pal_str, m_pal_str, pos_f_str, pos_c_str, vel_f_str, vel_c_str,retard_str, ball_id_str, (char *)NULL);
 
         /* Si arribem aquí, execlp ha fallat */
         perror("execlp fallida en crear nova pilota");
@@ -235,6 +237,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 	//posicio inicial de la pilota (enter)
 	f_pil= (int)pos_f;
 	c_pil= (int)pos_c;
+	fprintf(stderr, "Pelota %c: vel_f=%f, vel_c=%f\n", ball_id, vel_f, vel_c); //debug
 
 	/* Bucle infinit mentre la pilota estigui en joc */
     while (1) {
@@ -249,10 +252,13 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 
 			/* Comprovar rebot vertical (sostre, paleta, o bloc a dalt/baix) */
 			if (f_h != f_pil) {
+               	waitS(id_sem);
                 rv = win_quincar(f_h, c_pil);
+                signalS(id_sem);
                 if (rv != ' ') {
+                    waitS(id_sem);
                     tipus_bloc = comprovar_bloc(f_h, c_pil);
-
+                    signalS(id_sem);
                     /* Si és bloc 'B', crear nova pilota */
                     if (tipus_bloc == BLKCHAR) {
                         /* Crear nova pilota a la posició del bloc amb velocitat invertida */
@@ -268,6 +274,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 
 			/* Comprovar rebot horitzontal (parets laterals o costats dels blocs) */
 			if (c_h != c_pil) {
+			    waitS(id_sem);
                 rh = win_quincar(f_pil, c_h);
                 if (rh != ' ') {
                     tipus_bloc = comprovar_bloc(f_pil, c_h);
@@ -279,10 +286,12 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     vel_c = -vel_c;
                     c_h = pos_c + vel_c;
                 }
+                signalS(id_sem);
             }
 
 			/* Comprovar rebot diagonal (caires de les estructures) */
 			if ((f_h != f_pil) && (c_h != c_pil)) {
+                waitS(id_sem);
                 rd = win_quincar(f_h, c_h);
                 if (rd != ' ') {
                     tipus_bloc = comprovar_bloc(f_h, c_h);
@@ -296,9 +305,11 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     f_h = pos_f + vel_f;
                     c_h = pos_c + vel_c;
                 }
+                signalS(id_sem);
             }
 
 			/* Si l'espai està lliure, moure la pilota i redibuixar */
+			waitS(id_sem);
 			if (win_quincar(f_h, c_h) == ' ') {
 				win_escricar(f_pil, c_pil, ' ', NO_INV);
 				pos_f += vel_f;
@@ -310,6 +321,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 				if (f_pil != n_fil - 1) win_escricar(f_pil, c_pil, ball_id, INVERS);
 				else fora = 1;
 			}
+			signalS(id_sem);
 		} else {
 			/* Encara que no canviï de quadrat a la pantalla, actualitzem coordenades reals */
 			pos_f += vel_f;
@@ -323,8 +335,10 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
         win_retard(retard);
     }
 
+    waitS(id_sem);
     /* Netejar la pilota de la pantalla abans de sortir */
     win_escricar(f_pil, c_pil, ' ', NO_INV);
+    signalS(id_sem);
     return 1;  /* La pilota ha sortit */
 }
 
@@ -361,6 +375,7 @@ int main(int n_args, char *ll_args[])
     ball_id = ll_args[14][0];      /* Caràcter identificador de la pilota */
     retard = atoi(ll_args[15]);    /* Retard entre moviments */
 
+    fprintf(stderr, "DEBUG Pilota %c: Mi id_sem es %d\n", ball_id, id_sem); //debug
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);
     if (p_mem == NULL) {
