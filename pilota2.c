@@ -71,8 +71,9 @@ int nblocs;         /* nombre de blocs restants per trencar */
 int retard;			    /* valor del retard de moviment, en mil.lisegons */
 char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla */
 
-/* Variables globals per a la memòria compartida (IPC) */
+/* Variables globals per a la memòria compartida (IPC) i semàfors */
 int id_mem;             /* identificador de la memòria compartida creada */
+int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
 /* * Mostra el missatge final de partida a la línia d'estat i espera a que
@@ -333,8 +334,8 @@ int main(int n_args, char *ll_args[])
     char ball_id;
 
     /* Comprovació d'arguments: esperem 13 arguments */
-    /* Format: id_mem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
-    if (n_args != 14) {
+    /* Format: id_mem id_sem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
+    if (n_args != 15) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
         fprintf(stderr, "Ús: pilota1 id_mem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard\n");
         fprintf(stderr, "Arguments detectats: %d", n_args);
@@ -343,18 +344,19 @@ int main(int n_args, char *ll_args[])
 
     /* Llegir arguments de la línia de comandes */
     id_mem = atoi(ll_args[1]);
-    n_fil = atoi(ll_args[2]);
-    n_col = atoi(ll_args[3]);
-    m_por = atoi(ll_args[4]);
-    f_pal = atoi(ll_args[5]);      /* Fila de la paleta (sempre n_fil-2) */
-    c_pal = atoi(ll_args[6]);      /* Columna inicial de la paleta */
-    m_pal = atoi(ll_args[7]);      /* Mida de la paleta */
-    pos_f = atof(ll_args[8]);      /* Posició fila inicial de la pilota */
-    pos_c = atof(ll_args[9]);      /* Posició columna inicial de la pilota */
-    vel_f = atof(ll_args[10]);     /* Velocitat fila */
-    vel_c = atof(ll_args[11]);     /* Velocitat columna */
-    ball_id = ll_args[12][0];      /* Caràcter identificador de la pilota */
-    retard = atoi(ll_args[13]);    /* Retard entre moviments */
+    id_sem = atoi(ll_args[2]);
+    n_fil = atoi(ll_args[3]);
+    n_col = atoi(ll_args[4]);
+    m_por = atoi(ll_args[5]);
+    f_pal = atoi(ll_args[6]);      /* Fila de la paleta (sempre n_fil-2) */
+    c_pal = atoi(ll_args[7]);      /* Columna inicial de la paleta */
+    m_pal = atoi(ll_args[8]);      /* Mida de la paleta */
+    pos_f = atof(ll_args[9]);      /* Posició fila inicial de la pilota */
+    pos_c = atof(ll_args[10]);     /* Posició columna inicial de la pilota */
+    vel_f = atof(ll_args[11]);     /* Velocitat fila */
+    vel_c = atof(ll_args[12]);     /* Velocitat columna */
+    ball_id = ll_args[13][0];      /* Caràcter identificador de la pilota */
+    retard = atoi(ll_args[14]);    /* Retard entre moviments */
 
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);

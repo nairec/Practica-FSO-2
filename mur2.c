@@ -75,8 +75,9 @@ int f_pil, c_pil;		/* posicio de la pilota, en valor enter (per pintar a pantall
 float pos_f, pos_c;		/* posicio real de la pilota, en valor real (per a moviments suaus) */
 float vel_f, vel_c;		/* velocitat de la pilota (components horitzontal i vertical) */
 
-/* Variables globals per a la memòria compartida (IPC) */
+/* Variables globals per a la memòria compartida (IPC) i semàfors */
 int id_mem;             /* identificador de la memòria compartida creada */
+int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
 /* Variables de temps */
@@ -272,7 +273,7 @@ int main(int n_args, char *ll_args[])
 {
 	int i, fi1 = 0, fi2 = 0;
 	int ball_id = 0; // ball_id hauria de ser únic
-	char id_mem_s[20], n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
+	char id_mem_s[20], id_sem_s[20], n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
 	FILE *fit_conf;
 
     /* 1. Comprovació d'arguments d'entrada */
@@ -301,9 +302,13 @@ int main(int n_args, char *ll_args[])
 	printf("Joc del Mur: prem RETURN per continuar:\n");
 	getchar();
 
+	/* 3. Inicialitzem el semàfor */
+	id_sem = ini_sem(1);
+
 	/* 3. Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
     	sprintf(id_mem_s, "%d", id_mem);
+        sprintf(id_sem_s, "%d", id_sem);
        	sprintf(n_fil_s, "%d", n_fil);
        	sprintf(n_col_s, "%d", n_col);
 		sprintf(m_por_s, "%d", m_por);
@@ -316,11 +321,12 @@ int main(int n_args, char *ll_args[])
        	sprintf(vel_c_s, "%f", vel_c);
 		sprintf(ball_id_s, "%d", ball_id);
        	sprintf(retard_s, "%d", retard);
+
 	/* 4. Creació del procés fill per a la pilota */
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota1", "pilota1", id_mem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+		execlp("./pilota1", "pilota1", id_mem_s, id_sem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
 		exit(1);
 	}
 	do
