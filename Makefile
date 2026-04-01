@@ -6,7 +6,7 @@ CFLAGS = -Wall -g -fpermissive
 LIBS = -lcurses
 
 # Objectius principals (es compilen tots si fem 'make' a seques)
-all: mur0 mur1 pilota1
+all: mur0 mur1 mur2 pilota1 pilota2
 
 # Rutines compartides (llibreria gràfica i IPC)
 winsuport2.o: winsuport2.c winsuport2.h
@@ -35,20 +35,17 @@ mur1: mur1.o winsuport2.o memoria.o
 pilota1.o: pilota1.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c pilota1.c -o pilota1.o
 
-pilota2: pilota2.o winsuport2.o memoria.o
-	$(CC) $(CFLAGS) pilota2.o winsuport2.o memoria.o -o pilota2 $(LIBS)
-
 # --- FASE 2 ---
 mur2.o: mur2.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
 
-mur2: mur2.o winsuport2.o memoria.o
+mur2: mur2.o winsuport2.o memoria.o semafor.o
 	$(CC) $(CFLAGS) mur2.o winsuport2.o memoria.o semafor.o -o mur2 $(LIBS)
 
 pilota2.o: pilota2.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
 
-pilota2: pilota2.o winsuport2.o memoria.o
+pilota2: pilota2.o winsuport2.o memoria.o semafor.o
 	$(CC) $(CFLAGS) pilota2.o winsuport2.o memoria.o semafor.o -o pilota2 $(LIBS)
 
 # --- Neteja ---

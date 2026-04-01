@@ -217,7 +217,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 	//posicio inicial de la pilota (enter)
 	f_pil= (int)pos_f;
 	c_pil= (int)pos_c;
-	fprintf(stderr, "Pelota %c: vel_f=%f, vel_c=%f\n", ball_id, vel_f, vel_c);
+	fprintf(stderr, "Pelota %c: vel_f=%f, vel_c=%f\n", ball_id, vel_f, vel_c); //debug
 
 	/* Bucle infinit mentre la pilota estigui en joc */
     while (1) {
@@ -354,7 +354,7 @@ int main(int n_args, char *ll_args[])
     ball_id = ll_args[13][0];      /* Caràcter identificador de la pilota */
     retard = atoi(ll_args[14]);    /* Retard entre moviments */
 
-    fprintf(stderr, "DEBUG Pilota %c: Mi id_sem es %d\n", ball_id, id_sem);
+    fprintf(stderr, "DEBUG Pilota %c: Mi id_sem es %d\n", ball_id, id_sem); //debug
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);
     if (p_mem == NULL) {
