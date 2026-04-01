@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include "winsuport2.h"
 #include "memoria.h"
+#include "bustia.h"
 
 /* --- Definicions de constants --- */
 //#define MAX_THREADS	10 [maxim de fils] No fa falta perque a pilota1 no es creen fils (threads), nomes processos
@@ -75,6 +76,7 @@ char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla 
 int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
+int id_mis;
 
 /* * Mostra el missatge final de partida a la línia d'estat i espera a que
  * l'usuari premi una tecla per tancar l'aplicació.
@@ -333,7 +335,7 @@ int main(int n_args, char *ll_args[])
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
 
-    /* Comprovació d'arguments: esperem 13 arguments */
+    /* Comprovació d'arguments: esperem 15 arguments */
     /* Format: id_mem id_sem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
     if (n_args != 15) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
@@ -345,18 +347,19 @@ int main(int n_args, char *ll_args[])
     /* Llegir arguments de la línia de comandes */
     id_mem = atoi(ll_args[1]);
     id_sem = atoi(ll_args[2]);
-    n_fil = atoi(ll_args[3]);
-    n_col = atoi(ll_args[4]);
-    m_por = atoi(ll_args[5]);
-    f_pal = atoi(ll_args[6]);      /* Fila de la paleta (sempre n_fil-2) */
-    c_pal = atoi(ll_args[7]);      /* Columna inicial de la paleta */
-    m_pal = atoi(ll_args[8]);      /* Mida de la paleta */
-    pos_f = atof(ll_args[9]);      /* Posició fila inicial de la pilota */
-    pos_c = atof(ll_args[10]);     /* Posició columna inicial de la pilota */
-    vel_f = atof(ll_args[11]);     /* Velocitat fila */
-    vel_c = atof(ll_args[12]);     /* Velocitat columna */
-    ball_id = ll_args[13][0];      /* Caràcter identificador de la pilota */
-    retard = atoi(ll_args[14]);    /* Retard entre moviments */
+    id_mis = atoi(ll_args[3]);
+    n_fil = atoi(ll_args[4]);
+    n_col = atoi(ll_args[5]);
+    m_por = atoi(ll_args[6]);
+    f_pal = atoi(ll_args[7]);      /* Fila de la paleta (sempre n_fil-2) */
+    c_pal = atoi(ll_args[8]);      /* Columna inicial de la paleta */
+    m_pal = atoi(ll_args[9]);      /* Mida de la paleta */
+    pos_f = atof(ll_args[10]);      /* Posició fila inicial de la pilota */
+    pos_c = atof(ll_args[11]);     /* Posició columna inicial de la pilota */
+    vel_f = atof(ll_args[12]);     /* Velocitat fila */
+    vel_c = atof(ll_args[13]);     /* Velocitat columna */
+    ball_id = ll_args[14][0];      /* Caràcter identificador de la pilota */
+    retard = atoi(ll_args[15]);    /* Retard entre moviments */
 
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);
@@ -365,19 +368,24 @@ int main(int n_args, char *ll_args[])
         exit(1);
     }
 
-    /* Inicialitzar la biblioteca winsuport2 amb el punter de memòria */
-    win_set(p_mem, n_fil, n_col);
-
-    /* Obtenir el nombre de blocs de la memòria compartida */
-    /* NOTA: nblocs hauria d'estar a la memòria compartida. Per ara, el llegim del pare */
-    /* En aquesta fase inicial, nblocs es passa per argument? */
-    nblocs = 10;  /* Temporal: després es llegirà de memòria compartida */
-
-    /* Bucle principal: moure la pilota fins que surti */
-    mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
-
-    /* Alliberar recursos (no cal win_fi() perquè només el pare ho fa) */
-    /* Nota: no es fa elim_mem() perquè el pare és qui gestiona la memòria */
+    int crear_nueva_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, 
+                    float vel_f, float vel_c, int retard) {
+    missatge_t msg;
+    
+    /* Preparar el mensaje */
+    msg.mtype = MSG_NOVA_PILOTA;  /* Tipo de mensaje */
+    msg.fila = f_bloc;
+    msg.columna = c_bloc;
+    msg.vel_f = -vel_f;           /* Velocidad invertida */
+    msg.vel_c = -vel_c;
+    msg.c_pal = c_pal;
+    msg.m_pal = m_pal;
+    
+    /* Enviar mensaje al padre */
+    if (sendM(id_mis, &msg) == -1) {
+        fprintf(stderr, "Error al enviar mensaje para nueva pilota\n");
+        return -1;
+    }
 
 	return (0);
 }

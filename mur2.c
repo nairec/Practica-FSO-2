@@ -12,6 +12,7 @@
 #include <string.h>
 #include "winsuport2.h"
 #include "memoria.h"
+#include "bustia.h"
 
 /* --- Definicions de constants --- */
 #define MAX_THREADS	10
@@ -78,6 +79,7 @@ float vel_f, vel_c;		/* velocitat de la pilota (components horitzontal i vertica
 /* Variables globals per a la memòria compartida (IPC) i semàfors */
 int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
+int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
 /* Variables de temps */
@@ -305,28 +307,41 @@ int main(int n_args, char *ll_args[])
 	/* 3. Inicialitzem el semàfor */
 	id_sem = ini_sem(1);
 
-	/* 3. Inicialització de memòria compartida i curses */
+	/*3.1 Inicializamos la bústia */
+	id_mis = ini_mis();
+    if (id_mis == -1) {
+        fprintf(stderr, "Error al crear la bústia\n");
+        exit(4);
+    }
+
+	/* 3.2 Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
+	/* Preparar argumentos para pasar a pilota2 */
     	sprintf(id_mem_s, "%d", id_mem);
         sprintf(id_sem_s, "%d", id_sem);
-       	sprintf(n_fil_s, "%d", n_fil);
-       	sprintf(n_col_s, "%d", n_col);
+		sprintf(id_mis_s, "%d", id_mis);
+    	sprintf(n_fil_s, "%d", n_fil);
+    	sprintf(n_col_s, "%d", n_col);
 		sprintf(m_por_s, "%d", m_por);
 		sprintf(f_pal_s, "%d", f_pal);
 		sprintf(c_pal_s, "%d", c_pal);
 		sprintf(m_pal_s, "%d", m_pal);
-       	sprintf(pos_f_s, "%f", pos_f);
-       	sprintf(pos_c_s, "%f", pos_c);
-       	sprintf(vel_f_s, "%f", vel_f);
-       	sprintf(vel_c_s, "%f", vel_c);
+    	sprintf(pos_f_s, "%f", pos_f);
+    	sprintf(pos_c_s, "%f", pos_c);
+    	sprintf(vel_f_s, "%f", vel_f);
+    	sprintf(vel_c_s, "%f", vel_c);
 		sprintf(ball_id_s, "%d", ball_id);
-       	sprintf(retard_s, "%d", retard);
+    	sprintf(retard_s, "%d", retard);
 
-	/* 4. Creació del procés fill per a la pilota */
+		/* Preparamos los argumentos para pasar a pilota2 */
+		char id_mis_s[20];
+		sprintf(id_mis_s, "%d", id_mis);
+
+	/* 4. Creació del procés fill per a la pilota (ahora pasamos también id_mis) */
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota1", "pilota1", id_mem_s, id_sem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
 		exit(1);
 	}
 	do
@@ -339,4 +354,6 @@ int main(int n_args, char *ll_args[])
 	/* Refresc visual (propi de winsuport2) */
 	win_fi();
 	elim_mem(id_mem);
+	elim_sem(id_sem);
+    elim_mis(id_mis);
 }
