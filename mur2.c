@@ -1,6 +1,6 @@
 /*****************************************************************************/
 /* */
-/* mur1.c                                                                    */
+/* mur2.c                                                                    */
 /* */
 /* Programa inicial d'exemple per a les practiques 2 d'FSO.                  */
 /* Versió seqüencial adaptada a winsuport2 i memòria compartida IPC.         */
