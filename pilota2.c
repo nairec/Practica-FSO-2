@@ -66,8 +66,6 @@ char *descripcio[] = {
 
 /* --- Variables Globals --- */
 
-char ball_id;
-
 /* Variables de l'entorn de joc (llegides des dels arguments) */
 int n_fil, n_col;		/* dimensions del camp de joc */
 int m_por;			    /* mida de la porteria (en caracters) */
@@ -154,7 +152,7 @@ char comprovar_bloc(int f, int c)
 /* * Crea un nou procés pilota en la posició indicada amb la velocitat invertida.
  * Retorna 0 si s'ha creat correctament, -1 si hi ha error.
  */
-int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard)
+int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard, char ball_id)
 {
     missatge_nova_pilota_t msg;
 
