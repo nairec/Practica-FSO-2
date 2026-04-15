@@ -35,7 +35,6 @@
 /* COnstants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
-#define TIPUS_BLOC_TRENCAT 3
 
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
@@ -90,12 +89,13 @@ int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
 int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
+int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
+char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -156,10 +156,16 @@ int inicialitza_joc(void)
 		return (mida_mem);
 	}
 
+	nblocs_offset = mida_mem; // reservem espai després del buffer de la pantalla
+	mida_mem += sizeof(int); // sumem 4 bytes per nblocs
+
     /* Creació i assignació de la memòria compartida per a la pantalla */
 	id_mem = ini_mem(mida_mem);
 	p_mem = map_mem(id_mem);
 	win_set(p_mem, n_fil, n_col);
+
+	int *p_nblocs = (int *)((char *)p_mem + nblocs_offset);
+	*p_nblocs = 0;
 
     /* Càlcul de la porteria inferior */
 	if (m_por > n_col - 2) m_por = n_col - 2;
@@ -190,9 +196,9 @@ int inicialitza_joc(void)
 
     /* Generació dels blocs a destruir (files 3, 4 i 5) */
 	nb = 0;
-	nblocs = n_col / (BLKSIZE + BLKGAP) - 1;
-	offset = (n_col - nblocs * (BLKSIZE + BLKGAP) + BLKGAP) / 2;
-	for (i = 0; i < nblocs; i++) {
+	*p_nblocs = n_col / (BLKSIZE + BLKGAP) - 1;
+	offset = (n_col - *p_nblocs * (BLKSIZE + BLKGAP) + BLKGAP) / 2;
+	for (i = 0; i < *p_nblocs; i++) {
 		for (c = 0; c < BLKSIZE; c++) {
 			win_escricar(3, offset + c, FRNTCHAR, INVERS);
 			nb++;
@@ -203,7 +209,7 @@ int inicialitza_joc(void)
 		}
 		offset += BLKSIZE + BLKGAP;
 	}
-	nblocs = nb / BLKSIZE;
+	*p_nblocs = nb / BLKSIZE;
 
     /* Generació de les defenses indestructibles (fila 6) */
 	nb = n_col / (BLKSIZE + 2 * BLKGAP) - 2;
@@ -287,6 +293,13 @@ void actualitza_temps(void)
 	signalS(id_sem);
 }
 
+static char id_pilota_visible(int id)
+{
+	/* Evitem '0', 'A' i 'B' perquè tenen significat especial al taulell. */
+	if (id < 9) return (char)('1' + id);
+	return (char)('C' + ((id - 9) % ('Z' - 'C' + 1)));
+}
+
 void processa_bustia_no_blocant(void) {
 	missatge_t missatge;
 	int n;
@@ -307,8 +320,11 @@ void processa_bustia_no_blocant(void) {
 		}
 
 		if (missatge.tipus == TIPUS_NOVA_PILOTA) {
+			if (ball_id >= MAXBALLS) {
+				continue; /* No creem més processos del límit previst. */
+			}
 			// Processar nova pilota
-			id_char = (ball_id < 10) ? ('0' + ball_id) : ('A' + (ball_id - 10) % 26);
+			id_char = id_pilota_visible(ball_id);
 
 			sprintf(id_mem_s, "%d", id_mem);
 			sprintf(id_sem_s, "%d", id_sem);
@@ -324,20 +340,17 @@ void processa_bustia_no_blocant(void) {
 			sprintf(vel_c_s, "%f", missatge.vel_c);
 			sprintf(ball_id_s, "%c", id_char);
 			sprintf(retard_s, "%d", missatge.retard);
+			sprintf(nblocs_offset_s, "%d", nblocs_offset);
 
 			sprintf(id_mis_s, "%d", id_mis);
 
 			if (fork() == 0)
 			{
 				/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, (char *)NULL);
 				exit(1);
 			}
 			ball_id++;
-		}
-
-		if (missatge.tipus == TIPUS_BLOC_TRENCAT) {
-			nblocs--;
 		}
 	}
 }
@@ -348,7 +361,7 @@ int main(int n_args, char *ll_args[])
 	int i, fi1 = 0, fi2 = 0;
 	ball_id = 0;
 	FILE *fit_conf;
-
+	
     /* 1. Comprovació d'arguments d'entrada */
 	if ((n_args != 2) && (n_args != 3)) {
 		i = 0;
@@ -356,40 +369,40 @@ int main(int n_args, char *ll_args[])
 		while (descripcio[i][0] != '*');
 		exit(1);
 	}
-
+	
 	fit_conf = fopen(ll_args[1], "rt");
 	if (!fit_conf) {
 		fprintf(stderr, "Error: no s'ha pogut obrir el fitxer \'%s\'\n", ll_args[1]);
 		exit(2);
 	}
-
+	
     /* 2. Càrrega del fitxer i configuració del retard del joc */
 	if (carrega_configuracio(fit_conf) != 0) exit(3);
-
+	
 	if (n_args == 3) {
 		retard = atoi(ll_args[2]);
 		if (retard < 10) retard = 10;
 		if (retard > 1000) retard = 1000;
 	} else retard = 100;
-
+	
 	printf("Joc del Mur: prem RETURN per continuar:\n");
 	getchar();
-
+	
 	/* 3. Inicialitzem el semàfor */
 	id_sem = ini_sem(1);
-
+	
 	/*3.1 Inicializamos la bústia */
 	id_mis = ini_mis();
     if (id_mis == -1) {
-        fprintf(stderr, "Error al crear la bústia\n");
+		fprintf(stderr, "Error al crear la bústia\n");
         exit(4);
     }
-
 	/* 3.2 Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
+	int *p_nblocs = (int *)((char *)p_mem + nblocs_offset);
 	/* Preparar argumentos para pasar a pilota2 */
-	id_char = (ball_id < 10) ? ('0' + ball_id) : ('A' + (ball_id - 10) % 26);
-
+	id_char = id_pilota_visible(ball_id);
+	
     sprintf(id_mem_s, "%d", id_mem);
     sprintf(id_sem_s, "%d", id_sem);
     sprintf(id_mis_s, "%d", id_mis);
@@ -405,12 +418,13 @@ int main(int n_args, char *ll_args[])
     sprintf(vel_c_s, "%f", vel_c);
 	sprintf(ball_id_s, "%c", id_char);
     sprintf(retard_s, "%d", retard);
-
+	sprintf(nblocs_offset_s, "%d", nblocs_offset);
+	
 	/* 4. Creació del procés fill per a la pilota (ahora pasamos también id_mis) */
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s,(char *)NULL);
 		ball_id++;
 		exit(1);
 	}
@@ -419,12 +433,21 @@ int main(int n_args, char *ll_args[])
 		/* 5. Bucle de gestió (Pare) */
 		processa_bustia_no_blocant();
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
-		fi2 = (nblocs == 0);
+		fi2 = (*p_nblocs == 0);
 	} while (!fi1 && !fi2);
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
 	/* Refresc visual (propi de winsuport2) */
 	mostra_final("Partida finalitzada");
+	if (fi2==1) {
+		mostra_final("Has guanyat!");
+		printf("Has guanyat!\n");
+	}
+	if (fi1==1) {
+		mostra_final("Has perdut!");
+		printf("Has perdut!\n");
+	}
+
 	win_fi();
 	elim_mem(id_mem);
 	elim_sem(id_sem);

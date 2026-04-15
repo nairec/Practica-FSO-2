@@ -39,7 +39,6 @@
 /* Constants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
-#define TIPUS_BLOC_TRENCAT 3
 
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
@@ -83,6 +82,8 @@ int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int id_mis;
+int *p_nblocs;
+int nblocs_offset;
 
 /* * Mostra el missatge final de partida a la línia d'estat i espera a que
  * l'usuari premi una tecla per tancar l'aplicació.
@@ -116,7 +117,7 @@ char comprovar_bloc(int f, int c)
 	char quin = win_quincar(f, c);
 	char tipus_bloc = ' ';
 
-    if (quin == BLKCHAR || quin == FRNTCHAR) {
+    if ((quin == BLKCHAR || quin == FRNTCHAR)) {
         tipus_bloc = quin;  /* Guardem el tipus abans d'esborrar */
         col = c;
 
@@ -133,11 +134,8 @@ char comprovar_bloc(int f, int c)
         }
 
         /* Només decrementem el comptador si és un bloc trencable (A o B) */
-        if (quin == BLKCHAR || quin == FRNTCHAR) {
-            nblocs--; /* Decrementem el total de blocs pendents */
-            missatge_t msg;
-            msg.tipus = TIPUS_BLOC_TRENCAT;
-            sendM(id_mis, &msg, sizeof(msg));
+        if ((quin == BLKCHAR || quin == FRNTCHAR) && (p_nblocs != NULL)) {
+            (*p_nblocs)--; /* Decrementem el total de blocs pendents */
         }
         /* Nota: Si és FRNTCHAR ('A'), no decrementem nblocs perquè no és trencable? */
         /* Segons l'enunciat, 'A' també es trenca, així que cal revisar la definició */
@@ -308,11 +306,11 @@ int main(int n_args, char *ll_args[])
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
 
-    /* Comprovació d'arguments: esperem 15 arguments + nom del programa */
-    /* Format: id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
-    if (n_args != 16) {
+    /* Comprovació d'arguments: esperem 16 arguments + nom del programa */
+    /* Format: id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset */
+    if (n_args != 17) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
-        fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard\n");
+        fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset\n");
         fprintf(stderr, "Arguments detectats: %d\n", n_args);
         exit(1);
     }
@@ -333,6 +331,7 @@ int main(int n_args, char *ll_args[])
     vel_c = atof(ll_args[13]);     /* Velocitat columna */
     ball_id = ll_args[14][0];      /* Caràcter identificador de la pilota */
     retard = atoi(ll_args[15]);    /* Retard entre moviments */
+    nblocs_offset = atoi(ll_args[16]); /* Offset del nombre de blocs restants */
 
     fprintf(stderr, "DEBUG Pilota %c: Mi id_sem es %d\n", ball_id, id_sem); //debug
     /* Connectar a la memòria compartida */
@@ -341,6 +340,8 @@ int main(int n_args, char *ll_args[])
         fprintf(stderr, "Error: No s'ha pogut connectar a la memòria compartida\n");
         exit(1);
     }
+
+    p_nblocs = (int *)((char *)p_mem + nblocs_offset);
 
     win_set(p_mem, n_fil, n_col);
 
