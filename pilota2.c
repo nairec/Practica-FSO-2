@@ -157,7 +157,6 @@ int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f,
     msg.vel_c = -vel_c;
     msg.retard = retard;
     msg.tipus = TIPUS_NOVA_PILOTA;
-    msg.ball_id = ball_id;
 
     sendM(id_mis, &msg, sizeof(msg));
     return 0;

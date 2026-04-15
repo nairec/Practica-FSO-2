@@ -79,6 +79,7 @@ int dirPaleta = 0;      /* direcció de moviment de la paleta */
 
 /* Variables de la pilota */
 int ball_id;
+char id_char;
 int f_pil, c_pil;		/* posicio de la pilota, en valor enter (per pintar a pantalla) */
 float pos_f, pos_c;		/* posicio real de la pilota, en valor real (per a moviments suaus) */
 float vel_f, vel_c;		/* velocitat de la pilota (components horitzontal i vertical) */
@@ -306,6 +307,8 @@ static void processa_bustia_no_blocant(void) {
 
 		if (missatge.tipus == TIPUS_NOVA_PILOTA) {
 			// Processar nova pilota
+			id_char = (ball_id < 10) ? ('0' + ball_id) : ('A' + (ball_id - 10) % 26);
+
 			sprintf(id_mem_s, "%d", id_mem);
 			sprintf(id_sem_s, "%d", id_sem);
 			sprintf(n_fil_s, "%d", n_fil);
@@ -318,7 +321,7 @@ static void processa_bustia_no_blocant(void) {
 			sprintf(pos_c_s, "%f", (float)missatge.columna);
 			sprintf(vel_f_s, "%f", missatge.vel_f);
 			sprintf(vel_c_s, "%f", missatge.vel_c);
-			sprintf(ball_id_s, "%c", missatge.ball_id);
+			sprintf(ball_id_s, "%c", id_char);
 			sprintf(retard_s, "%d", missatge.retard);
 
 			sprintf(id_mis_s, "%d", id_mis);
@@ -381,6 +384,8 @@ int main(int n_args, char *ll_args[])
 	/* 3.2 Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
 	/* Preparar argumentos para pasar a pilota2 */
+		id_char = (ball_id < 10) ? ('0' + ball_id) : ('A' + (ball_id - 10) % 26);
+
     	sprintf(id_mem_s, "%d", id_mem);
         sprintf(id_sem_s, "%d", id_sem);
         sprintf(id_mis_s, "%d", id_mis);
@@ -394,7 +399,7 @@ int main(int n_args, char *ll_args[])
     	sprintf(pos_c_s, "%f", pos_c);
     	sprintf(vel_f_s, "%f", vel_f);
     	sprintf(vel_c_s, "%f", vel_c);
-		sprintf(ball_id_s, "%d", ball_id);
+		sprintf(ball_id_s, "%c", id_char);
     	sprintf(retard_s, "%d", retard);
 
 	/* 4. Creació del procés fill per a la pilota (ahora pasamos también id_mis) */

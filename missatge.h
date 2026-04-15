@@ -43,5 +43,4 @@ typedef struct {
     float vel_f;
     float vel_c;
     int retard;
-    char ball_id;
 } missatge_nova_pilota_t;
