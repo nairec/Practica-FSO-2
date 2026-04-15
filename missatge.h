@@ -33,3 +33,15 @@ int ini_mis();
 void elim_mis(int id_mis);
 void sendM (int id_mis, void * missatge, int nbytes);
 int receiveM (int id_mis, void * missatge);
+
+typedef struct {
+    int tipus; // Control o nova pilota
+    int fila;
+    int columna;
+    int c_pal;
+    int m_pal;
+    float vel_f;
+    float vel_c;
+    int retard;
+    char ball_id;
+} missatge_nova_pilota_t;

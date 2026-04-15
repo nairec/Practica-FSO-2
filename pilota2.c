@@ -36,6 +36,10 @@
 #define NO_INV 0
 #define INVERS 1
 
+/* Constants per enviar missatges */
+#define TIPUS_CONTROL 1
+#define TIPUS_NOVA_PILOTA 2
+
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
 	"\n",
@@ -66,8 +70,6 @@ char *descripcio[] = {
 
 /* --- Variables Globals --- */
 
-char ball_id;
-
 /* Variables de l'entorn de joc (llegides des dels arguments) */
 int n_fil, n_col;		/* dimensions del camp de joc */
 int m_por;			    /* mida de la porteria (en caracters) */
@@ -80,17 +82,6 @@ int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int id_mis;
-
-typedef struct {
-    int fila;
-    int columna;
-    int c_pal;
-    int m_pal;
-    float vel_f;
-    float vel_c;
-    int retard;
-    char ball_id;
-} missatge_nova_pilota_t;
 
 /* * Mostra el missatge final de partida a la línia d'estat i espera a que
  * l'usuari premi una tecla per tancar l'aplicació.
@@ -154,7 +145,7 @@ char comprovar_bloc(int f, int c)
 /* * Crea un nou procés pilota en la posició indicada amb la velocitat invertida.
  * Retorna 0 si s'ha creat correctament, -1 si hi ha error.
  */
-int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard)
+int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard, char ball_id)
 {
     missatge_nova_pilota_t msg;
 
@@ -165,6 +156,7 @@ int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f,
     msg.vel_f = -vel_f;
     msg.vel_c = -vel_c;
     msg.retard = retard;
+    msg.tipus = TIPUS_NOVA_PILOTA;
     msg.ball_id = ball_id;
 
     sendM(id_mis, &msg, sizeof(msg));
@@ -226,7 +218,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     /* Si és bloc 'B', crear nova pilota */
                     if (tipus_bloc == BLKCHAR) {
                         /* Crear nova pilota a la posició del bloc amb velocitat invertida */
-                        crear_nova_pilota(f_h, c_pil, c_pal, m_pal, vel_f, vel_c, retard);
+                        crear_nova_pilota(f_h, c_pil, c_pal, m_pal, vel_f, vel_c, retard, ball_id);
                     }
 
                     if (rv == '0')
@@ -244,7 +236,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     tipus_bloc = comprovar_bloc(f_pil, c_h);
 
                     if (tipus_bloc == BLKCHAR) {
-                        crear_nova_pilota(f_pil, c_h, c_pal, m_pal, vel_f, vel_c, retard);
+                        crear_nova_pilota(f_pil, c_h, c_pal, m_pal, vel_f, vel_c, retard, ball_id);
                     }
 
                     vel_c = -vel_c;
@@ -261,7 +253,7 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
                     tipus_bloc = comprovar_bloc(f_h, c_h);
 
                     if (tipus_bloc == BLKCHAR) {
-                        crear_nova_pilota(f_h, c_h, c_pal, m_pal, vel_f, vel_c, retard);
+                        crear_nova_pilota(f_h, c_h, c_pal, m_pal, vel_f, vel_c, retard, ball_id);
                     }
 
                     vel_f = -vel_f;
@@ -346,6 +338,8 @@ int main(int n_args, char *ll_args[])
         fprintf(stderr, "Error: No s'ha pogut connectar a la memòria compartida\n");
         exit(1);
     }
+
+    win_set(p_mem, n_fil, n_col);
 
     (void)mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
     return 0;

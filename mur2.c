@@ -10,9 +10,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "winsuport2.h"
 #include "memoria.h"
 #include "semafor.h"
+#include "missatge.h"
 
 /* --- Definicions de constants --- */
 #define MAX_THREADS	10
@@ -29,6 +31,10 @@
 #define WLLCHAR '#'
 #define FRNTCHAR 'A'
 #define LONGMISS	65
+
+/* COnstants per enviar missatges */
+#define TIPUS_CONTROL 1
+#define TIPUS_NOVA_PILOTA 2
 
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
@@ -72,6 +78,7 @@ int m_pal;              /* mida de la paleta (en caracters) */
 int dirPaleta = 0;      /* direcció de moviment de la paleta */
 
 /* Variables de la pilota */
+int ball_id;
 int f_pil, c_pil;		/* posicio de la pilota, en valor enter (per pintar a pantalla) */
 float pos_f, pos_c;		/* posicio real de la pilota, en valor real (per a moviments suaus) */
 float vel_f, vel_c;		/* velocitat de la pilota (components horitzontal i vertical) */
@@ -84,6 +91,9 @@ void *p_mem;            /* punter cap a la zona de memòria mapejada */
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
+
+/* Variables per a la conversió de valors a cadenes */
+char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -275,12 +285,61 @@ void actualitza_temps(void)
 	signalS(id_sem);
 }
 
+static void processa_bustia_no_blocant(void) {
+	missatge_nova_pilota_t missatge;
+	int n;
+
+	missatge.tipus = TIPUS_CONTROL;
+	
+	sendM(id_mis, &missatge, sizeof(missatge));
+
+	while(1) {
+		n = receiveM(id_mis, &missatge);
+
+		if (n != sizeof(missatge)) {
+			continue; // Descartem missatge mal format
+		}
+
+		if (missatge.tipus == TIPUS_CONTROL) {
+			break; // Fi de la cua de missatges
+		}
+
+		if (missatge.tipus == TIPUS_NOVA_PILOTA) {
+			// Processar nova pilota
+			sprintf(id_mem_s, "%d", id_mem);
+			sprintf(id_sem_s, "%d", id_sem);
+			sprintf(n_fil_s, "%d", n_fil);
+			sprintf(n_col_s, "%d", n_col);
+			sprintf(m_por_s, "%d", m_por);
+			sprintf(c_pal_s, "%d", missatge.c_pal);
+			sprintf(m_pal_s, "%d", m_pal);
+			sprintf(f_pal_s, "%d", n_fil - 2);
+			sprintf(pos_f_s, "%f", (float)missatge.fila);
+			sprintf(pos_c_s, "%f", (float)missatge.columna);
+			sprintf(vel_f_s, "%f", missatge.vel_f);
+			sprintf(vel_c_s, "%f", missatge.vel_c);
+			sprintf(ball_id_s, "%c", missatge.ball_id);
+			sprintf(retard_s, "%d", missatge.retard);
+
+			sprintf(id_mis_s, "%d", id_mis);
+
+			if (fork() == 0)
+			{
+				/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+				exit(1);
+			}
+			ball_id++;
+		}
+
+	}
+}
+
 /* --- Programa Principal --- */
 int main(int n_args, char *ll_args[])
 {
 	int i, fi1 = 0, fi2 = 0;
-	int ball_id = 0; // ball_id hauria de ser únic
-	char id_mem_s[20], id_sem_s[20], n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
+	ball_id = 0;
 	FILE *fit_conf;
 
     /* 1. Comprovació d'arguments d'entrada */
@@ -324,6 +383,7 @@ int main(int n_args, char *ll_args[])
 	/* Preparar argumentos para pasar a pilota2 */
     	sprintf(id_mem_s, "%d", id_mem);
         sprintf(id_sem_s, "%d", id_sem);
+        sprintf(id_mis_s, "%d", id_mis);
     	sprintf(n_fil_s, "%d", n_fil);
     	sprintf(n_col_s, "%d", n_col);
 		sprintf(m_por_s, "%d", m_por);
@@ -337,10 +397,6 @@ int main(int n_args, char *ll_args[])
 		sprintf(ball_id_s, "%d", ball_id);
     	sprintf(retard_s, "%d", retard);
 
-		/* Preparamos los argumentos para pasar a pilota2 */
-		char id_mis_s[20];
-		sprintf(id_mis_s, "%d", id_mis);
-
 	/* 4. Creació del procés fill per a la pilota (ahora pasamos también id_mis) */
 	if (fork() == 0)
 	{
@@ -348,9 +404,11 @@ int main(int n_args, char *ll_args[])
 		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
 		exit(1);
 	}
+	ball_id++;
 	do
 	{
 		/* 5. Bucle de gestió (Pare) */
+		processa_bustia_no_blocant();
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 	} while (!fi1 && !fi2);
 	/* Gestió del teclat */
