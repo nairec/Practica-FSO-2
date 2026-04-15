@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include "winsuport2.h"
 #include "memoria.h"
-#include "bustia.h"
+#include "missatge.h"
 #include "semafor.h"
 
 /* --- Definicions de constants --- */
@@ -81,6 +81,17 @@ int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int id_mis;
 
+typedef struct {
+    int fila;
+    int columna;
+    int c_pal;
+    int m_pal;
+    float vel_f;
+    float vel_c;
+    int retard;
+    char ball_id;
+} missatge_nova_pilota_t;
+
 /* * Mostra el missatge final de partida a la línia d'estat i espera a que
  * l'usuari premi una tecla per tancar l'aplicació.
  */
@@ -145,65 +156,18 @@ char comprovar_bloc(int f, int c)
  */
 int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard)
 {
-    pid_t pid;
-    char id_mem_str[20], id_sem_str[20], n_fil_str[20], n_col_str[20], m_por_str[20];
-    char f_pal_str[20], c_pal_str[20], m_pal_str[20];
-    char pos_f_str[20], pos_c_str[20], vel_f_str[20], vel_c_str[20];
-    char retard_str[20], ball_id_str[5];
-    int next_ball_id = ball_id + 1;  /* Per assignar identificadors únics */
+    missatge_nova_pilota_t msg;
 
-    /* Crear el nou procés */
-    pid = fork();
+    msg.fila = f_bloc;
+    msg.columna = c_bloc;
+    msg.c_pal = c_pal;
+    msg.m_pal = m_pal;
+    msg.vel_f = -vel_f;
+    msg.vel_c = -vel_c;
+    msg.retard = retard;
+    msg.ball_id = ball_id;
 
-    if (pid == -1) {
-        perror("Error en fork per crear nova pilota");
-        return -1;
-    }
-
-    if (pid == 0) {
-        /* Procés fill: executar el nou programa pilota */
-
-        /* Convertir paràmetres a strings */
-        sprintf(id_mem_str, "%d", id_mem);
-        sprintf(id_sem_str, "%d", id_sem);
-        sprintf(n_fil_str, "%d", n_fil);
-        sprintf(n_col_str, "%d", n_col);
-        sprintf(m_por_str, "%d", m_por);
-
-        /* La paleta té les mateixes coordenades que la pilota original */
-        /* Necessitem obtenir la posició actual de la paleta de la memòria compartida */
-        /* Per ara, utilitzem valors fixos; després es llegiran de memòria compartida */
-        sprintf(f_pal_str, "%d", n_fil - 2);  /* Fila de la paleta */
-        sprintf(c_pal_str, "%d", c_pal);      /* Columna de la paleta */
-        sprintf(m_pal_str, "%d", m_pal);      /* Mida de la paleta */
-
-        /* Posició: la mateixa fila del bloc, columna centrada */
-        /* La pilota apareix a la posició on era el bloc */
-        sprintf(pos_f_str, "%f", (float)f_bloc);
-        sprintf(pos_c_str, "%f", (float)c_bloc);
-
-        /* Velocitat: invertim la direcció perquè surti en direcció contrària */
-        sprintf(vel_f_str, "%f", -vel_f);
-        sprintf(vel_c_str, "%f", -vel_c);
-
-        sprintf(retard_str, "%d", retard);
-
-        /* Identificador de la nova pilota: dígit o lletra */
-        if (next_ball_id <= 9) {
-            sprintf(ball_id_str, "%d", next_ball_id);
-        } else {
-            sprintf(ball_id_str, "%c", 'a' + (next_ball_id - 10));
-        }
-
-        /* Executar el programa pilota1 */
-        execlp("./pilota2", "pilota2", id_mem_str, id_sem_str, n_fil_str, n_col_str, m_por_str, f_pal_str, c_pal_str, m_pal_str, pos_f_str, pos_c_str, vel_f_str, vel_c_str,retard_str, ball_id_str, (char *)NULL);
-
-        /* Si arribem aquí, execlp ha fallat */
-        perror("execlp fallida en crear nova pilota");
-        exit(1);
-    }
-
-    /* Procés pare: continuar amb la pilota actual */
+    sendM(id_mis, &msg, sizeof(msg));
     return 0;
 }
 
@@ -349,12 +313,12 @@ int main(int n_args, char *ll_args[])
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
 
-    /* Comprovació d'arguments: esperem 15 arguments */
-    /* Format: id_mem id_sem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
-    if (n_args != 15) {
+    /* Comprovació d'arguments: esperem 15 arguments + nom del programa */
+    /* Format: id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard */
+    if (n_args != 16) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
-        fprintf(stderr, "Ús: pilota1 id_mem n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard\n");
-        fprintf(stderr, "Arguments detectats: %d", n_args);
+        fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard\n");
+        fprintf(stderr, "Arguments detectats: %d\n", n_args);
         exit(1);
     }
 
@@ -383,24 +347,6 @@ int main(int n_args, char *ll_args[])
         exit(1);
     }
 
-    int crear_nueva_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, 
-                    float vel_f, float vel_c, int retard) {
-    missatge_t msg;
-    
-    /* Preparar el mensaje */
-    msg.mtype = MSG_NOVA_PILOTA;  /* Tipo de mensaje */
-    msg.fila = f_bloc;
-    msg.columna = c_bloc;
-    msg.vel_f = -vel_f;           /* Velocidad invertida */
-    msg.vel_c = -vel_c;
-    msg.c_pal = c_pal;
-    msg.m_pal = m_pal;
-    
-    /* Enviar mensaje al padre */
-    if (sendM(id_mis, &msg) == -1) {
-        fprintf(stderr, "Error al enviar mensaje para nueva pilota\n");
-        return -1;
-    }
-
-	return (0);
+    (void)mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
+    return 0;
 }

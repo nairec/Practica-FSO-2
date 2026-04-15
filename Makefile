@@ -1,18 +1,18 @@
 # Makefile per a la Pràctica 2 d'FSO
-# Compilació dels programes mur0, mur1 i pilota1
+# Compilació dels programes mur0, mur1, pilota1, mur2 i pilota2
 
 CC = gcc
 CFLAGS = -Wall -g -fpermissive
 LIBS = -lcurses
 
-# Objectes comuns per a totes les fases
-OBJS_COMUNES = winsuport2.o memoria.o semafor.o bustia.o
+# Objectes comuns per a les fases amb IPC (memòria, semàfors i missatges)
+OBJS_COMUNES = winsuport2.o memoria.o semafor.o missatge.o
 LDFLAGS = -lcurses
 
-# Objectius principals (es compilen tots si fem 'make' a seques)
+# Objectius principals
 all: mur0 mur1 pilota1 mur2 pilota2
 
-# Rutines compartides (llibreria gràfica i IPC)
+# Rutines compartides (llibreria gràfica i IPC) [cite: 77, 45, 51]
 winsuport2.o: winsuport2.c winsuport2.h
 	$(CC) $(CFLAGS) -c winsuport2.c -o winsuport2.o
 
@@ -22,17 +22,17 @@ memoria.o: memoria.c memoria.h
 semafor.o: semafor.c semafor.h
 	$(CC) $(CFLAGS) -c semafor.c -o semafor.o
 
-bustia.o: bustia.c bustia.h
-	$(CC) $(CFLAGS) -c bustia.c -o bustia.o
+missatge.o: missatge.c missatge.h
+	$(CC) $(CFLAGS) -c missatge.c -o missatge.o
 
-# --- FASE 0 ---
+# --- FASE 0 [cite: 39] ---
 mur0.o: mur0.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c mur0.c -o mur0.o
 
 mur0: mur0.o winsuport2.o memoria.o
 	$(CC) $(CFLAGS) mur0.o winsuport2.o memoria.o -o mur0 $(LIBS)
 
-# --- FASE 1 ---
+# --- FASE 1 [cite: 43] ---
 mur1.o: mur1.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c mur1.c -o mur1.o
 
@@ -42,50 +42,23 @@ mur1: mur1.o winsuport2.o memoria.o
 pilota1.o: pilota1.c winsuport2.h memoria.h
 	$(CC) $(CFLAGS) -c pilota1.c -o pilota1.o
 
-# --- FASE 2 ---
-mur2.o: mur2.c winsuport2.h memoria.h
-	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
+pilota1: pilota1.o winsuport2.o memoria.o
+	$(CC) $(CFLAGS) pilota1.o winsuport2.o memoria.o -o pilota1 $(LIBS)
 
-mur2: mur2.o winsuport2.o memoria.o semafor.o
-	$(CC) $(CFLAGS) mur2.o winsuport2.o memoria.o semafor.o -o mur2 $(LIBS)
-
-pilota2.o: pilota2.c winsuport2.h memoria.h
-	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
-
-pilota2: pilota2.o winsuport2.o memoria.o semafor.o
-	$(CC) $(CFLAGS) pilota2.o winsuport2.o memoria.o semafor.o -o pilota2 $(LIBS)
-
-# --------- FASE 2
-mur2.o: mur2.c winsuport2.h memoria.h semafor.h bustia.h
+# --- FASE 2 [cite: 49] ---
+mur2.o: mur2.c winsuport2.h memoria.h semafor.h missatge.h
 	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
 
 mur2: mur2.o $(OBJS_COMUNES)
 	$(CC) -o mur2 mur2.o $(OBJS_COMUNES) $(LDFLAGS)
 
-pilota2.o: pilota2.c winsuport2.h memoria.h semafor.h bustia.h
+pilota2.o: pilota2.c winsuport2.h memoria.h semafor.h missatge.h
 	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
 
 pilota2: pilota2.o $(OBJS_COMUNES)
 	$(CC) -o pilota2 pilota2.o $(OBJS_COMUNES) $(LDFLAGS)
-
-# ------------
-
-# --------- FASE 2
-mur2.o: mur2.c winsuport2.h memoria.h semafor.h bustia.h
-	$(CC) $(CFLAGS) -c mur2.c -o mur2.o
-
-mur2: mur2.o $(OBJS_COMUNES)
-	$(CC) -o mur2 mur2.o $(OBJS_COMUNES) $(LDFLAGS)
-
-pilota2.o: pilota2.c winsuport2.h memoria.h semafor.h bustia.h
-	$(CC) $(CFLAGS) -c pilota2.c -o pilota2.o
-
-pilota2: pilota2.o $(OBJS_COMUNES)
-	$(CC) -o pilota2 pilota2.o $(OBJS_COMUNES) $(LDFLAGS)
-
-# ------------
 
 # --- Neteja ---
-# Executar 'make clean' per esborrar els binaris i fitxers objecte
+# Executar 'make clean' per esborrar binaris i fitxers objecte [cite: 53]
 clean:
 	rm -f *.o mur0 mur1 pilota1 mur2 pilota2

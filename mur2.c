@@ -13,7 +13,6 @@
 #include "winsuport2.h"
 #include "memoria.h"
 #include "semafor.h"
-#include "bustia.h"
 
 /* --- Definicions de constants --- */
 #define MAX_THREADS	10
@@ -325,7 +324,6 @@ int main(int n_args, char *ll_args[])
 	/* Preparar argumentos para pasar a pilota2 */
     	sprintf(id_mem_s, "%d", id_mem);
         sprintf(id_sem_s, "%d", id_sem);
-		sprintf(id_mis_s, "%d", id_mis);
     	sprintf(n_fil_s, "%d", n_fil);
     	sprintf(n_col_s, "%d", n_col);
 		sprintf(m_por_s, "%d", m_por);
