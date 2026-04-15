@@ -83,7 +83,9 @@ int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int id_mis;
 int *p_nblocs;
+int *p_npilotes;
 int nblocs_offset;
+int npilotes_offset;
 
 /* * Mostra el missatge final de partida a la línia d'estat i espera a que
  * l'usuari premi una tecla per tancar l'aplicació.
@@ -286,7 +288,14 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 		}
 
 		/* Si la pilota ha sortit, sortir del bucle */
-        if (fora) break;
+        if (fora) {
+            waitS(id_sem);
+            if (p_npilotes != NULL && *p_npilotes > 0) {
+                (*p_npilotes)--; /* Decrementem el nombre de pilotes en joc */
+            }
+            signalS(id_sem);
+            break;
+        };
 
         /* Pausa per controlar la velocitat */
         win_retard(retard);
@@ -306,9 +315,9 @@ int main(int n_args, char *ll_args[])
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
 
-    /* Comprovació d'arguments: esperem 16 arguments + nom del programa */
-    /* Format: id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset */
-    if (n_args != 17) {
+    /* Comprovació d'arguments: esperem 17 arguments + nom del programa */
+    /* Format: id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset npilotes_offset */
+    if (n_args != 18) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
         fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset\n");
         fprintf(stderr, "Arguments detectats: %d\n", n_args);
@@ -332,8 +341,8 @@ int main(int n_args, char *ll_args[])
     ball_id = ll_args[14][0];      /* Caràcter identificador de la pilota */
     retard = atoi(ll_args[15]);    /* Retard entre moviments */
     nblocs_offset = atoi(ll_args[16]); /* Offset del nombre de blocs restants */
+    npilotes_offset = atoi(ll_args[17]); /* Offset del nombre de pilotes en joc */
 
-    fprintf(stderr, "DEBUG Pilota %c: Mi id_sem es %d\n", ball_id, id_sem); //debug
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);
     if (p_mem == NULL) {
@@ -342,6 +351,7 @@ int main(int n_args, char *ll_args[])
     }
 
     p_nblocs = (int *)((char *)p_mem + nblocs_offset);
+    p_npilotes = (int *)((char *)p_mem + npilotes_offset);
 
     win_set(p_mem, n_fil, n_col);
 

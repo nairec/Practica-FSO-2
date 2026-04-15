@@ -90,12 +90,14 @@ int id_sem;             /* identificador del semàfor */
 int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
+int npilotes_offset;	  /* offset dins de la memòria compartida on es guarda el nombre de pilotes en joc */
+int *p_npilotes;
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20];
+char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -157,7 +159,9 @@ int inicialitza_joc(void)
 	}
 
 	nblocs_offset = mida_mem; // reservem espai després del buffer de la pantalla
+	npilotes_offset = mida_mem + sizeof(int); // reservem espai per un int més (npilotes)
 	mida_mem += sizeof(int); // sumem 4 bytes per nblocs
+	mida_mem += sizeof(int); // sumem 4 bytes per npilotes
 
     /* Creació i assignació de la memòria compartida per a la pantalla */
 	id_mem = ini_mem(mida_mem);
@@ -166,6 +170,9 @@ int inicialitza_joc(void)
 
 	int *p_nblocs = (int *)((char *)p_mem + nblocs_offset);
 	*p_nblocs = 0;
+
+	p_npilotes = (int *)((char *)p_mem + npilotes_offset);
+	*p_npilotes = 0;
 
     /* Càlcul de la porteria inferior */
 	if (m_por > n_col - 2) m_por = n_col - 2;
@@ -341,16 +348,23 @@ void processa_bustia_no_blocant(void) {
 			sprintf(ball_id_s, "%c", id_char);
 			sprintf(retard_s, "%d", missatge.retard);
 			sprintf(nblocs_offset_s, "%d", nblocs_offset);
+			sprintf(npilotes_offset_s, "%d", npilotes_offset);
 
 			sprintf(id_mis_s, "%d", id_mis);
 
-			if (fork() == 0)
+			pid_t pid = fork();
+			if (pid == 0)
 			{
 				/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, (char *)NULL);
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
 				exit(1);
 			}
-			ball_id++;
+			if (pid > 0) {
+				waitS(id_sem);
+				(*p_npilotes)++;
+				signalS(id_sem);
+				ball_id++;
+			}
 		}
 	}
 }
@@ -419,14 +433,21 @@ int main(int n_args, char *ll_args[])
 	sprintf(ball_id_s, "%c", id_char);
     sprintf(retard_s, "%d", retard);
 	sprintf(nblocs_offset_s, "%d", nblocs_offset);
+	sprintf(npilotes_offset_s, "%d", npilotes_offset);
 	
-	/* 4. Creació del procés fill per a la pilota (ahora pasamos también id_mis) */
-	if (fork() == 0)
+	/* 4. Creació del procés fill per a la pilota */
+	pid_t pid = fork();
+	if (pid == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s,(char *)NULL);
-		ball_id++;
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
 		exit(1);
+	}
+	if (pid > 0) {
+		waitS(id_sem);
+		(*p_npilotes)++;
+		signalS(id_sem);
+		ball_id++;
 	}
 	do
 	{
@@ -443,7 +464,7 @@ int main(int n_args, char *ll_args[])
 		mostra_final("Has guanyat!");
 		printf("Has guanyat!\n");
 	}
-	if (fi1==1) {
+	if (*p_npilotes == 0) {
 		mostra_final("Has perdut!");
 		printf("Has perdut!\n");
 	}
