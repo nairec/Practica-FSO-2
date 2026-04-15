@@ -286,7 +286,15 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 		}
 
 		/* Si la pilota ha sortit, sortir del bucle */
-        if (fora) break;
+        if (fora){
+            missatge_t msg;
+            msg.mtype = 1;
+            msg.tipus = TIPUS_PILOTA_MOR;
+            msg.ball_id = ball_id;
+            sendM(id_mis, &msg, sizeof(msg));
+            break;
+        }
+        
 
         /* Pausa per controlar la velocitat */
         win_retard(retard);

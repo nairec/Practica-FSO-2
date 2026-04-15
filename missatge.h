@@ -22,6 +22,7 @@
 
 #define TAM_MAX_MIS 128
 #define UNIC 1
+#define TIPUS_PILOTA_MOR 3
 
 typedef struct {
 	long tipus;	/* tipus del missatge a enviar. Es far servir per
@@ -35,6 +36,7 @@ void sendM (int id_mis, void * missatge, int nbytes);
 int receiveM (int id_mis, void * missatge);
 
 typedef struct {
+    long mtype;
     int tipus; // Control o nova pilota
     int fila;
     int columna;
@@ -43,4 +45,6 @@ typedef struct {
     float vel_f;
     float vel_c;
     int retard;
+    char ball_id;        /* Añadir para identificar qué pilota muere */
+
 } missatge_t;

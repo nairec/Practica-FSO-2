@@ -71,6 +71,7 @@ int m_por;			    /* mida de la porteria (en caracters) */
 int nblocs = 0;         /* nombre de blocs restants per trencar */
 int retard;			    /* valor del retard de moviment, en mil.lisegons */
 char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla */
+int pilotes_activas = 0;
 
 /* Variables de la paleta */
 int f_pal, c_pal;		/* posicio del primer caracter de la paleta (fila, columna) */
@@ -309,6 +310,7 @@ void processa_bustia_no_blocant(void) {
 	sendM(id_mis, &missatge, sizeof(missatge));
 
 	while(1) {
+
 		n = receiveM(id_mis, &missatge);
 
 		if (n != sizeof(missatge)) {
@@ -317,6 +319,11 @@ void processa_bustia_no_blocant(void) {
 
 		if (missatge.tipus == TIPUS_CONTROL) {
 			break; // Fi de la cua de missatges
+		}
+
+		if (missatge.tipus == TIPUS_PILOTA_MOR) {
+			pilotes_activas--;
+			continue;
 		}
 
 		if (missatge.tipus == TIPUS_NOVA_PILOTA) {
@@ -351,6 +358,7 @@ void processa_bustia_no_blocant(void) {
 				exit(1);
 			}
 			ball_id++;
+			pilotes_activas++;
 		}
 	}
 }
@@ -428,13 +436,15 @@ int main(int n_args, char *ll_args[])
 		ball_id++;
 		exit(1);
 	}
+	pilotes_activas = 1;
+
 	do
 	{
 		/* 5. Bucle de gestió (Pare) */
 		processa_bustia_no_blocant();
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 		fi2 = (*p_nblocs == 0);
-	} while (!fi1 && !fi2);
+	} while (!fi1 && !fi2 && pilotes_activas > 0);
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
 	/* Refresc visual (propi de winsuport2) */
@@ -442,8 +452,11 @@ int main(int n_args, char *ll_args[])
 	if (fi2==1) {
 		mostra_final("Has guanyat!");
 		printf("Has guanyat!\n");
-	}
-	if (fi1==1) {
+
+	} else if (pilotes_activas == 0) {
+    mostra_final("Has perdut! T'has quedat sense pilotes");
+
+	}else if (fi1==1) {
 		mostra_final("Has perdut!");
 		printf("Has perdut!\n");
 	}
