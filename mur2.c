@@ -455,7 +455,7 @@ int main(int n_args, char *ll_args[])
 		processa_bustia_no_blocant();
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 		fi2 = (*p_nblocs == 0);
-	} while (!fi1 && !fi2);
+	} while (!fi1 && !fi2 && *p_npilotes > 0);
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
 	/* Refresc visual (propi de winsuport2) */
