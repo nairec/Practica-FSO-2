@@ -116,7 +116,7 @@ char comprovar_bloc(int f, int c)
 	char tipus_bloc = ' ';
 
     if (quin == BLKCHAR || quin == FRNTCHAR) {
-        tipus_bloc = quin;  /* Guardem el tipus abans d'esborrar */
+        tipus_bloc = quin;
         col = c;
 
         /* Esborrar cap a la dreta fins trobar un espai buit */
@@ -134,12 +134,17 @@ char comprovar_bloc(int f, int c)
         /* Només decrementem el comptador si és un bloc trencable (A o B) */
         if (quin == BLKCHAR || quin == FRNTCHAR) {
             nblocs--; /* Decrementem el total de blocs pendents */
+            
+            /* Si no quedan bloques, avisar al padre */
+            if (nblocs == 0) {
+                missatge_fi_t msg_fi;
+                msg_fi.tipus = TIPUS_FI_JUEGO;
+                sendM(id_mis, &msg_fi, sizeof(msg_fi));
+            }
         }
-        /* Nota: Si és FRNTCHAR ('A'), no decrementem nblocs perquè no és trencable? */
-        /* Segons l'enunciat, 'A' també es trenca, així que cal revisar la definició */
     }
 
-    return tipus_bloc;  /* Retornem el tipus de bloc ('A', 'B', '#', etc.) */
+    return tipus_bloc;
 }
 
 /* * Crea un nou procés pilota en la posició indicada amb la velocitat invertida.

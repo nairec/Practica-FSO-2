@@ -22,12 +22,18 @@
 
 #define TAM_MAX_MIS 128
 #define UNIC 1
+#define TIPUS_FI_JUEGO 3
 
 typedef struct {
 	long tipus;	/* tipus del missatge a enviar. Es far servir per
 			   quan es volen tenir prioritats als missatges */
 	char missatge[TAM_MAX_MIS];
 	} tmis;
+
+typedef struct {
+    long tipus;  /* Debe ser el primer campo para msgrcv */
+    /* No necesita más campos */
+} missatge_fi_t;
 
 int ini_mis();
 void elim_mis(int id_mis);
