@@ -39,6 +39,7 @@
 /* Constants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
+#define TIPUS_BLOC_TRENCAT 3
 
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
@@ -134,6 +135,9 @@ char comprovar_bloc(int f, int c)
         /* Només decrementem el comptador si és un bloc trencable (A o B) */
         if (quin == BLKCHAR || quin == FRNTCHAR) {
             nblocs--; /* Decrementem el total de blocs pendents */
+            missatge_t msg;
+            msg.tipus = TIPUS_BLOC_TRENCAT;
+            sendM(id_mis, &msg, sizeof(msg));
         }
         /* Nota: Si és FRNTCHAR ('A'), no decrementem nblocs perquè no és trencable? */
         /* Segons l'enunciat, 'A' també es trenca, així que cal revisar la definició */
@@ -147,7 +151,7 @@ char comprovar_bloc(int f, int c)
  */
 int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard, char ball_id)
 {
-    missatge_nova_pilota_t msg;
+    missatge_t msg;
 
     msg.fila = f_bloc;
     msg.columna = c_bloc;

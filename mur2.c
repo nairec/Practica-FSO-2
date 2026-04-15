@@ -35,6 +35,7 @@
 /* COnstants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
+#define TIPUS_BLOC_TRENCAT 3
 
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
@@ -286,8 +287,8 @@ void actualitza_temps(void)
 	signalS(id_sem);
 }
 
-static void processa_bustia_no_blocant(void) {
-	missatge_nova_pilota_t missatge;
+void processa_bustia_no_blocant(void) {
+	missatge_t missatge;
 	int n;
 
 	missatge.tipus = TIPUS_CONTROL;
@@ -335,6 +336,9 @@ static void processa_bustia_no_blocant(void) {
 			ball_id++;
 		}
 
+		if (missatge.tipus == TIPUS_BLOC_TRENCAT) {
+			nblocs--;
+		}
 	}
 }
 
@@ -384,37 +388,38 @@ int main(int n_args, char *ll_args[])
 	/* 3.2 Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
 	/* Preparar argumentos para pasar a pilota2 */
-		id_char = (ball_id < 10) ? ('0' + ball_id) : ('A' + (ball_id - 10) % 26);
+	id_char = (ball_id < 10) ? ('0' + ball_id) : ('A' + (ball_id - 10) % 26);
 
-    	sprintf(id_mem_s, "%d", id_mem);
-        sprintf(id_sem_s, "%d", id_sem);
-        sprintf(id_mis_s, "%d", id_mis);
-    	sprintf(n_fil_s, "%d", n_fil);
-    	sprintf(n_col_s, "%d", n_col);
-		sprintf(m_por_s, "%d", m_por);
-		sprintf(f_pal_s, "%d", f_pal);
-		sprintf(c_pal_s, "%d", c_pal);
-		sprintf(m_pal_s, "%d", m_pal);
-    	sprintf(pos_f_s, "%f", pos_f);
-    	sprintf(pos_c_s, "%f", pos_c);
-    	sprintf(vel_f_s, "%f", vel_f);
-    	sprintf(vel_c_s, "%f", vel_c);
-		sprintf(ball_id_s, "%c", id_char);
-    	sprintf(retard_s, "%d", retard);
+    sprintf(id_mem_s, "%d", id_mem);
+    sprintf(id_sem_s, "%d", id_sem);
+    sprintf(id_mis_s, "%d", id_mis);
+    sprintf(n_fil_s, "%d", n_fil);
+    sprintf(n_col_s, "%d", n_col);
+	sprintf(m_por_s, "%d", m_por);
+	sprintf(f_pal_s, "%d", f_pal);
+	sprintf(c_pal_s, "%d", c_pal);
+	sprintf(m_pal_s, "%d", m_pal);
+    sprintf(pos_f_s, "%f", pos_f);
+    sprintf(pos_c_s, "%f", pos_c);
+    sprintf(vel_f_s, "%f", vel_f);
+    sprintf(vel_c_s, "%f", vel_c);
+	sprintf(ball_id_s, "%c", id_char);
+    sprintf(retard_s, "%d", retard);
 
 	/* 4. Creació del procés fill per a la pilota (ahora pasamos también id_mis) */
 	if (fork() == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
 		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+		ball_id++;
 		exit(1);
 	}
-	ball_id++;
 	do
 	{
 		/* 5. Bucle de gestió (Pare) */
 		processa_bustia_no_blocant();
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
+		fi2 = (nblocs == 0);
 	} while (!fi1 && !fi2);
 	/* Gestió del teclat */
 	/* Control de minuts:segons */
