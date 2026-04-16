@@ -374,6 +374,7 @@ void processa_bustia_no_blocant(void) {
 int main(int n_args, char *ll_args[])
 {
 	int i, fi1 = 0, fi2 = 0;
+	char missatge_final[50];
 	ball_id = 0;
 	FILE *fit_conf;
 	
@@ -463,7 +464,8 @@ int main(int n_args, char *ll_args[])
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 		fi2 = (*p_nblocs == 0);
 	} while (!fi1 && !fi2 && *p_npilotes > 0);
-	mostra_final("Partida finalitzada");
+	sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
+	mostra_final(missatge_final);
 	if (fi2==1) {
 		mostra_final("Has guanyat!");
 		printf("Has guanyat!\n");
