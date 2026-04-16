@@ -44,7 +44,7 @@ int win_ini(int *fil, int *col, char creq, unsigned int inv)
   p_fil = (LINES - *fil)/ 2;		/* posicio de la finestra centrada */
   p_col = (COLS - *col) / 2;
 			      /* canviar interrupcio de final de proces */
-  oldsig = signal(SIGINT,win_fi);
+  oldsig = signal(SIGINT,(void (*)(int))win_fi); // Aquesta lÃ­nia donaba error perque faltaba el cast a void (*)(int)
 			     /* configuracio preliminar de les curses */
   cbreak();			/* rep tecles sense buffering */
   noecho();			/* no fa echo de les tecles llegides */
@@ -94,7 +94,7 @@ void win_set(void *p_mem, int n_fil, int n_col)
 /*	a la funcio win_ini(), tot i que s'emmagatzemen a les		*/
 /*	variables globals Nfil,Ncol: aquestes variables s'inicialitzen	*/
 /*	a la crida win_ini() que fa el proces pare i, per tant, el seu	*/
-/*	valor NO es traspassa als processos fill. Per aix˜, els		*/
+/*	valor NO es traspassa als processos fill. Per aixï¿½, els		*/
 /*	processos fill hauran d'invocar la win_set() especificant num.	*/
 /*	de files i de columnes del camp de joc (que poden rebre a	*/
 /*	traves d'arguments de programa), per tal que la copia de Nfil i	*/

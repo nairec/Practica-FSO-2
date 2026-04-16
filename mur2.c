@@ -32,7 +32,7 @@
 #define FRNTCHAR 'A'
 #define LONGMISS	65
 
-/* COnstants per enviar missatges */
+/* Constants per a enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
 
@@ -91,7 +91,8 @@ int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
 int npilotes_offset;	  /* offset dins de la memòria compartida on es guarda el nombre de pilotes en joc */
-int *p_npilotes;
+int *p_npilotes; 		/* punter al comptador de pilotes compartit */
+int *p_nblocs;          /* punter al comptador de blocs compartit */
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
@@ -168,7 +169,7 @@ int inicialitza_joc(void)
 	p_mem = map_mem(id_mem);
 	win_set(p_mem, n_fil, n_col);
 
-	int *p_nblocs = (int *)((char *)p_mem + nblocs_offset);
+	p_nblocs = (int *)((char *)p_mem + nblocs_offset);
 	*p_nblocs = 0;
 
 	p_npilotes = (int *)((char *)p_mem + npilotes_offset);
@@ -302,7 +303,7 @@ void actualitza_temps(void)
 
 static char id_pilota_visible(int id)
 {
-	/* Evitem '0', 'A' i 'B' perquè tenen significat especial al taulell. */
+	/* Evitem '0', 'A' i 'B' perquè tenen significat especial al taulell */
 	if (id < 9) return (char)('1' + id);
 	return (char)('C' + ((id - 9) % ('Z' - 'C' + 1)));
 }
@@ -315,7 +316,7 @@ void processa_bustia_no_blocant(void) {
 	
 	sendM(id_mis, &missatge, sizeof(missatge));
 
-	while(1) {
+	while(true) {
 		n = receiveM(id_mis, &missatge);
 
 		if (n != sizeof(missatge)) {
@@ -328,7 +329,7 @@ void processa_bustia_no_blocant(void) {
 
 		if (missatge.tipus == TIPUS_NOVA_PILOTA) {
 			if (ball_id >= MAXBALLS) {
-				continue; /* No creem més processos del límit previst. */
+				continue; /* No creem més processos del límit previst */
 			}
 			// Processar nova pilota
 			id_char = id_pilota_visible(ball_id);
@@ -359,7 +360,7 @@ void processa_bustia_no_blocant(void) {
 				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
 				exit(1);
 			}
-			if (pid > 0) {
+			if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
 				waitS(id_sem);
 				(*p_npilotes)++;
 				signalS(id_sem);
@@ -405,7 +406,7 @@ int main(int n_args, char *ll_args[])
 	/* 3. Inicialitzem el semàfor */
 	id_sem = ini_sem(1);
 	
-	/*3.1 Inicializamos la bústia */
+	/*3.1 Inicialitzem la bústia */
 	id_mis = ini_mis();
     if (id_mis == -1) {
 		fprintf(stderr, "Error al crear la bústia\n");
@@ -413,8 +414,11 @@ int main(int n_args, char *ll_args[])
     }
 	/* 3.2 Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
-	int *p_nblocs = (int *)((char *)p_mem + nblocs_offset);
-	/* Preparar argumentos para pasar a pilota2 */
+
+
+	/* Inicialització de punter a comptador de blocs*/
+	p_nblocs = (int *)((char *)p_mem + nblocs_offset);
+	/* Preparar arguments per passar a pilota2 */
 	id_char = id_pilota_visible(ball_id);
 	
     sprintf(id_mem_s, "%d", id_mem);
@@ -443,7 +447,7 @@ int main(int n_args, char *ll_args[])
 		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
 		exit(1);
 	}
-	if (pid > 0) {
+	if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
 		waitS(id_sem);
 		(*p_npilotes)++;
 		signalS(id_sem);
@@ -453,12 +457,12 @@ int main(int n_args, char *ll_args[])
 	{
 		/* 5. Bucle de gestió (Pare) */
 		processa_bustia_no_blocant();
+		/* Gestió del teclat */
+		/* Control de minuts:segons */
+		/* Refresc visual (propi de winsuport2) */
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 		fi2 = (*p_nblocs == 0);
 	} while (!fi1 && !fi2 && *p_npilotes > 0);
-	/* Gestió del teclat */
-	/* Control de minuts:segons */
-	/* Refresc visual (propi de winsuport2) */
 	mostra_final("Partida finalitzada");
 	if (fi2==1) {
 		mostra_final("Has guanyat!");

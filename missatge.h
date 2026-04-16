@@ -34,6 +34,7 @@ void elim_mis(int id_mis);
 void sendM (int id_mis, void * missatge, int nbytes);
 int receiveM (int id_mis, void * missatge);
 
+// Definicio del missatge que s'enviara entre els processos
 typedef struct {
     int tipus; // Control o nova pilota
     int fila;

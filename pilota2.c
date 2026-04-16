@@ -1,9 +1,8 @@
 /*****************************************************************************/
 /* */
 /* pilota2.c                                                                    */
-/* */
-/* Programa inicial d'exemple per a les practiques 2 d'FSO.                  */
-/* Versió seqüencial adaptada a winsuport2 i memòria compartida IPC.         */
+/* */                  
+/* Versió seqüencial adaptada a winsuport2 i memòria compartida IPC amb semàfors.         */
 /* */
 /*****************************************************************************/
 
@@ -17,22 +16,12 @@
 #include "semafor.h"
 
 /* --- Definicions de constants --- */
-//#define MAX_THREADS	10 [maxim de fils] No fa falta perque a pilota1 no es creen fils (threads), nomes processos
-//#define MAXBALLS	(MAX_THREADS-1) [maxim de pilotes] No fa falta perque cada procés pilota nomes controla UNA pilota
-//[validacio de dimensions] Les dimensions ja venen validades pel pare mur1
-//#define MIN_FIL	10
-//#define MAX_FIL	50
-//#define MIN_COL	10
-//#define MAX_COL	80
 
 /* Constants per a la creació dels blocs del joc */
-//#define BLKSIZE	3 [Mida dels blocs en caràcters] No es necessita per al moviment de la pilota, només per crear blocs
-//#define BLKGAP	2 [Espai entre blocs] Només per a la creació inicial del taulell
-#define BLKCHAR 'B' //[identificar blocs indestructibles en col.lisions]
-#define WLLCHAR '#' //[identificar parets indestructibles]
-#define FRNTCHAR 'A' //[identificar blocs frontissa (tipus A)]
-#define LONGMISS 65 //[Mida del buffer per missatges]
-//[controlar l'atribut invers en dibuixar (win_escricar)]
+#define BLKCHAR 'B'
+#define WLLCHAR '#'
+#define FRNTCHAR 'A'
+#define LONGMISS 65
 #define NO_INV 0
 #define INVERS 1
 
@@ -82,28 +71,10 @@ int id_mem;             /* identificador de la memòria compartida creada */
 int id_sem;             /* identificador del semàfor */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int id_mis;
-int *p_nblocs;
-int *p_npilotes;
-int nblocs_offset;
-int npilotes_offset;
-
-/* * Mostra el missatge final de partida a la línia d'estat i espera a que
- * l'usuari premi una tecla per tancar l'aplicació.
- */
-void mostra_final(char *miss)
-{
-	int lmarge;
-	char marge[LONGMISS];
-
-    /* Centra el text calculant el marge necessari */
-	lmarge=(n_col+strlen(miss))/2;
-	sprintf(marge,"%%%ds",lmarge);
-
-	sprintf(strin, marge,miss);
-	win_escristr(strin);
-	win_update();
-	getchar();
-}
+int *p_nblocs;          /* punter al comptador de blocs compartit */
+int *p_npilotes;        /* punter al comptador de pilotes compartit */
+int nblocs_offset;      /* desplaçament del comptador de blocs a memòria compartida */
+int npilotes_offset;    /* desplaçament del comptador de pilotes a memòria compartida */
 
 /* Prototipus de funcions */
 char comprovar_bloc(int f, int c);
@@ -139,8 +110,6 @@ char comprovar_bloc(int f, int c)
         if ((quin == BLKCHAR || quin == FRNTCHAR) && (p_nblocs != NULL)) {
             (*p_nblocs)--; /* Decrementem el total de blocs pendents */
         }
-        /* Nota: Si és FRNTCHAR ('A'), no decrementem nblocs perquè no és trencable? */
-        /* Segons l'enunciat, 'A' també es trenca, així que cal revisar la definició */
     }
 
     return tipus_bloc;  /* Retornem el tipus de bloc ('A', 'B', '#', etc.) */
@@ -196,7 +165,6 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 	//posicio inicial de la pilota (enter)
 	f_pil= (int)pos_f;
 	c_pil= (int)pos_c;
-	fprintf(stderr, "Pelota %c: vel_f=%f, vel_c=%f\n", ball_id, vel_f, vel_c); //debug
 
 	/* Bucle infinit mentre la pilota estigui en joc */
     while (1) {
@@ -350,11 +318,12 @@ int main(int n_args, char *ll_args[])
         exit(1);
     }
 
+    /* Inicialitzar punters als comptadors compartits */
     p_nblocs = (int *)((char *)p_mem + nblocs_offset);
     p_npilotes = (int *)((char *)p_mem + npilotes_offset);
 
     win_set(p_mem, n_fil, n_col);
 
-    (void)mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
+    mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
     return 0;
 }
