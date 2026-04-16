@@ -16,12 +16,22 @@
 #include "semafor.h"
 
 /* --- Definicions de constants --- */
+//#define MAX_THREADS	10 [maxim de fils] No fa falta perque a pilota2 no es creen fils (threads), només processos
+//#define MAXBALLS	(MAX_THREADS-1) [maxim de pilotes] No fa falta perque cada procés pilota nomes controla UNA pilota
+//[validacio de dimensions] Les dimensions ja venen validades pel pare mur2
+//#define MIN_FIL	10
+//#define MAX_FIL	50
+//#define MIN_COL	10
+//#define MAX_COL	80
 
 /* Constants per a la creació dels blocs del joc */
-#define BLKCHAR 'B'
-#define WLLCHAR '#'
-#define FRNTCHAR 'A'
-#define LONGMISS 65
+//#define BLKSIZE	3 [Mida dels blocs en caràcters] No es necessita per al moviment de la pilota, només per crear blocs
+//#define BLKGAP	2 [Espai entre blocs] Només per a la creació inicial del taulell
+#define BLKCHAR 'B' // identificar blocs indestructibles en col.lisions
+#define WLLCHAR '#' // identificar parets indestructibles
+#define FRNTCHAR 'A' // identificar blocs frontissa (tipus A)
+#define LONGMISS 65 // Mida del buffer per missatges
+//controlar l'atribut invers en dibuixar (win_escricar)
 #define NO_INV 0
 #define INVERS 1
 

@@ -24,10 +24,13 @@
 //#define MAX_COL	80
 
 /* Constants per a la creació dels blocs del joc */
-#define BLKCHAR 'B'
-#define WLLCHAR '#'
-#define FRNTCHAR 'A'
-#define LONGMISS 65
+//#define BLKSIZE	3 [Mida dels blocs en caràcters] No es necessita per al moviment de la pilota, només per crear blocs
+//#define BLKGAP	2 [Espai entre blocs] Només per a la creació inicial del taulell
+#define BLKCHAR 'B' //[identificar blocs indestructibles en col.lisions]
+#define WLLCHAR '#' //[identificar parets indestructibles]
+#define FRNTCHAR 'A' //[identificar blocs frontissa (tipus A)]
+#define LONGMISS 65 //[Mida del buffer per missatges]
+//[controlar l'atribut invers en dibuixar (win_escricar)]
 #define NO_INV 0
 #define INVERS 1
 
@@ -345,7 +348,7 @@ int main(int n_args, char *ll_args[])
     win_set(p_mem, n_fil, n_col);
 
     /* Obtenir el nombre de blocs de la memòria compartida */
-
+    /* NOTA: nblocs hauria d'estar a la memòria compartida. Per ara, el llegim del pare */
     /* En aquesta fase inicial, nblocs es passa per argument? */
     nblocs = 10;  /* Temporal: després es llegirà de memòria compartida */
 
@@ -353,7 +356,7 @@ int main(int n_args, char *ll_args[])
     mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
 
     /* Alliberar recursos (no cal win_fi() perquè només el pare ho fa) */
-
+    /* Nota: no es fa elim_mem() perquè el pare és qui gestiona la memòria */
 
 	return (0);
 }

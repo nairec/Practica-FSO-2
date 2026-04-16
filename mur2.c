@@ -32,7 +32,7 @@
 #define FRNTCHAR 'A'
 #define LONGMISS	65
 
-/* Constants per a enviar missatges */
+/* COnstants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
 
