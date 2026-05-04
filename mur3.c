@@ -1,6 +1,6 @@
 /*****************************************************************************/
 /* */
-/* mur2.c                                                                    */
+/* mur3.c                                                                    */
 /* */
 /* Programa inicial d'exemple per a les practiques 2 d'FSO.                  */
 /* Versió seqüencial adaptada a winsuport2 i memòria compartida IPC.         */
@@ -36,6 +36,18 @@
 /* COnstants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
+
+/* Struct de tipus Paleta */
+typedef struct {
+	int fila;
+	int col_inicial;
+	int col_actual;
+	int dir_lateral;
+	int dir_vertical;
+	int amplada;
+	int id;
+	pthread_t thread_id;
+} paleta_t;
 
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
@@ -73,10 +85,9 @@ int nblocs = 0;         /* nombre de blocs restants per trencar */
 int retard;			    /* valor del retard de moviment, en mil.lisegons */
 char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla */
 
-/* Variables de la paleta */
-int f_pal, c_pal;		/* posicio del primer caracter de la paleta (fila, columna) */
-int m_pal;              /* mida de la paleta (en caracters) */
-int dirPaleta = 0;      /* direcció de moviment de la paleta */
+/* Llista de paletes i comptador */
+paleta_t paletes[MAX_THREADS];
+int n_paletes = 0;
 
 /* Variables de la pilota */
 int ball_id;
@@ -92,6 +103,7 @@ int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
 int npilotes_offset;	  /* offset dins de la memòria compartida on es guarda el nombre de pilotes en joc */
+int paletes_offset; 	/* offset dins de la memòria compartida on es guarda la informació de les paletes */
 int *p_npilotes; 		/* punter al comptador de pilotes compartit */
 int *p_nblocs;          /* punter al comptador de blocs compartit */
 
@@ -99,7 +111,7 @@ int *p_nblocs;          /* punter al comptador de blocs compartit */
 int milisegons = 0, segons = 0, minuts = 0;
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20];
+char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20], paletes_offset_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -107,10 +119,18 @@ char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[
 int carrega_configuracio(FILE * fit)
 {
 	int ret = 0;
+	int i = 0;
 
 	fscanf(fit, "%d %d %d\n", &n_fil, &n_col, &m_por);
-	fscanf(fit, "%d %d\n", &c_pal, &m_pal);
 	fscanf(fit, "%f %f %f %f\n", &pos_f, &pos_c, &vel_f, &vel_c);
+
+	/* Llegim files començant amb el caràcter P per inicialitzar les paletes*/
+	while (i < MAX_THREADS && fscanf(fit, "P %d %d %d %d\n", 
+        &paletes[i].fila, &paletes[i].col_inicial, &paletes[i].dir_lateral, &paletes[i].mida) == 4) {
+        paletes[i].id = i + 1;  // ID automátic
+        i++;
+    }
+	n_paletes = i;
 
     /* Validació de les dimensions i posicions per evitar errors gràfics */
 	if ((n_fil != 0) || (n_col != 0)) {
@@ -124,9 +144,10 @@ int carrega_configuracio(FILE * fit)
 	if ((vel_f < -1.0) || (vel_f > 1.0) || (vel_c < -1.0) || (vel_c > 1.0))
 		ret = 4;
 
-	if (c_pal != 0 && m_pal != 0) {
-		if ((m_pal < 1) || (m_pal > n_col - 3) || (c_pal < 1) || (c_pal + m_pal > n_col - 1))
+	for (int j = 0; j < n_paletes; j++) {
+		if ((paletes[j].amplada < 1) || (paletes[j].amplada >= n_col - 3) || (paletes[j].col_inicial < 1) || (paletes[j].col_inicial + paletes[j].amplada > n_col - 1))
 			ret = 5;
+			break;
 	}
 
 	if (ret != 0) {
@@ -162,10 +183,12 @@ int inicialitza_joc(void)
 
 	nblocs_offset = mida_mem; // reservem espai després del buffer de la pantalla
 	npilotes_offset = mida_mem + sizeof(int); // reservem espai per un int més (npilotes)
+	paletes_offset = mida_mem + 2*sizeof(int); // reservem espai per un int més (paletes)
 	mida_mem += sizeof(int); // sumem 4 bytes per nblocs
 	mida_mem += sizeof(int); // sumem 4 bytes per npilotes
-
-    /* Creació i assignació de la memòria compartida per a la pantalla */
+	mida_mem += sizeof(paleta_t) * n_paletes; // sumem espai per les paletes
+	
+	/* Creació i assignació de la memòria compartida per a la pantalla */
 	id_mem = ini_mem(mida_mem);
 	p_mem = map_mem(id_mem);
 	win_set(p_mem, n_fil, n_col);
@@ -175,6 +198,15 @@ int inicialitza_joc(void)
 
 	p_npilotes = (int *)((char *)p_mem + npilotes_offset);
 	*p_npilotes = 0;
+
+	paleta_t *p_paletes = (paleta_t *)((char *)p_mem + paletes_offset);
+	for (i = 0; i < n_paletes; i++) {
+		p_paletes[i] = paletes[i]; // Copiem la informació de les paletes a la memòria compartida
+		p_paletes[i].col_actual = paletes[i].col_inicial; // Inicialitzem la columna actual
+		p_paletes[i].dir_vertical = 0; // Inicialitzem la direcció vertical	
+	}
+
+
 
     /* Càlcul de la porteria inferior */
 	if (m_por > n_col - 2) m_por = n_col - 2;
@@ -187,14 +219,13 @@ int inicialitza_joc(void)
 	n_fil = n_fil - 1;
 	f_pal = n_fil - 2;
 
-	/* Mode automàtic per a la paleta (si al fitxer s'ha passat valor 0) */
-	if (m_pal == 0) m_pal = m_por / 2;
-	if (m_pal < 1) m_pal = 1;
-	if (c_pal == 0) c_pal = (n_col - m_pal) / 2;
-
-    /* Dibuixar la paleta a la pantalla */
-	for (i = 0; i < m_pal; i++)
-		win_escricar(f_pal, c_pal + i, '0', INVERS);
+	
+	/* Ubicar i dibuixar les paletes */
+	for (int p = 0; p < n_paletes; p++) {
+		for (int i = 0; i < paletes[p].mida; i++) {
+			win_escricar(paletes[p].fila, paletes[p].col_inicial + i, '0', INVERS);
+		}
+	}
 
     /* Ubicar i dibuixar la pilota a la posició inicial */
 	if (pos_f > n_fil - 1) pos_f = n_fil - 1;
@@ -440,13 +471,19 @@ int main(int n_args, char *ll_args[])
     sprintf(retard_s, "%d", retard);
 	sprintf(nblocs_offset_s, "%d", nblocs_offset);
 	sprintf(npilotes_offset_s, "%d", npilotes_offset);
+	sprintf(paletes_offset_s, "%d", paletes_offset);
+
+	/* Creació dels threads per a les paletes */
+	for (int i = 0; i < n_paletes; i++) {
+		pthread_create(&p_paletes[i].thread_id, NULL, mou_paleta_thread, &p_paletes[i]);
+	}
 	
 	/* 4. Creació del procés fill per a la pilota */
 	pid_t pid = fork();
 	if (pid == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
 		exit(1);
 	}
 	if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -455,6 +492,7 @@ int main(int n_args, char *ll_args[])
 		signalS(id_sem);
 		ball_id++;
 	}
+
 	do
 	{
 		/* 5. Bucle de gestió (Pare) */

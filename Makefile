@@ -7,7 +7,7 @@ LIBS = -lcurses
 
 # Objectes comuns per a les fases amb IPC (memòria, semàfors i missatges)
 OBJS_COMUNS = winsuport2.o memoria.o semafor.o missatge.o
-LDFLAGS = -lcurses
+LDFLAGS = -lcurses -lpthread
 
 # Objectius principals
 all: mur0 mur1 pilota1 mur2 pilota2

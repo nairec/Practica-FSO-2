@@ -89,7 +89,7 @@ int npilotes_offset;    /* desplaçament del comptador de pilotes a memòria com
 /* Prototipus de funcions */
 char comprovar_bloc(int f, int c);
 float control_impacte2(int c_pil, float velc0, int c_pal, int m_pal);
-int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float vel_f, float vel_c, char ball_id);
+int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id);
 
 /* * Donada una posició on la pilota ha xocat, comprova si és un bloc de lletres.
  * Si ho és, esborra tot el bloc de la pantalla i redueix el comptador de blocs.
@@ -164,7 +164,7 @@ float control_impacte2(int c_pil, float velc0, int c_pal, int m_pal) {
  * Calcula la següent posició i gestiona els rebots amb parets, blocs i paleta.
  * Retorna 1 si s'ha d'acabar el joc (es guanya o es perd), 0 si s'ha de continuar.
  */
-int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
+int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
 {
 	int f_h, c_h;
 	int f_pil, c_pil; //posicio actual de la pilota (enter)
@@ -289,15 +289,14 @@ int mou_pilota(int f_pal, int c_pal, int m_pal, float pos_f, float pos_c, float 
 /* --- Programa Principal --- */
 int main(int n_args, char *ll_args[])
 {
-	int f_pal, c_pal, m_pal;
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
 
-    /* Comprovació d'arguments: esperem 17 arguments + nom del programa */
-    /* Format: id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset npilotes_offset */
-    if (n_args != 18) {
+    /* Comprovació d'arguments: esperem 14 arguments + nom del programa */
+    /* Format: id_mem id_sem id_mis n_fil n_col m_por pos_f pos_c vel_f vel_c ball_id retard nblocs_offset paletes_offset */
+    if (n_args != 15) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
-        fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por f_pal c_pal m_pal pos_f pos_c vel_f vel_c ball_id retard nblocs_offset\n");
+        fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por pos_f pos_c vel_f vel_c ball_id retard nblocs_offset paletes_offset\n");
         fprintf(stderr, "Arguments detectats: %d\n", n_args);
         exit(1);
     }
@@ -309,17 +308,15 @@ int main(int n_args, char *ll_args[])
     n_fil = atoi(ll_args[4]);
     n_col = atoi(ll_args[5]);
     m_por = atoi(ll_args[6]);
-    f_pal = atoi(ll_args[7]);      /* Fila de la paleta (sempre n_fil-2) */
-    c_pal = atoi(ll_args[8]);      /* Columna inicial de la paleta */
-    m_pal = atoi(ll_args[9]);      /* Mida de la paleta */
-    pos_f = atof(ll_args[10]);      /* Posició fila inicial de la pilota */
-    pos_c = atof(ll_args[11]);     /* Posició columna inicial de la pilota */
-    vel_f = atof(ll_args[12]);     /* Velocitat fila */
-    vel_c = atof(ll_args[13]);     /* Velocitat columna */
-    ball_id = ll_args[14][0];      /* Caràcter identificador de la pilota */
-    retard = atoi(ll_args[15]);    /* Retard entre moviments */
-    nblocs_offset = atoi(ll_args[16]); /* Offset del nombre de blocs restants */
-    npilotes_offset = atoi(ll_args[17]); /* Offset del nombre de pilotes en joc */
+    pos_f = atof(ll_args[7]);      /* Posició fila inicial de la pilota */
+    pos_c = atof(ll_args[8]);     /* Posició columna inicial de la pilota */
+    vel_f = atof(ll_args[9]);     /* Velocitat fila */
+    vel_c = atof(ll_args[10]);     /* Velocitat columna */
+    ball_id = ll_args[11][0];      /* Caràcter identificador de la pilota */
+    retard = atoi(ll_args[12]);    /* Retard entre moviments */
+    nblocs_offset = atoi(ll_args[13]); /* Offset del nombre de blocs restants */
+    npilotes_offset = atoi(ll_args[14]); /* Offset del nombre de pilotes en joc */
+    paletes_offset = atoi(ll_args[15]); /* Offset del nombre de paletes en joc */
 
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);
@@ -334,6 +331,6 @@ int main(int n_args, char *ll_args[])
 
     win_set(p_mem, n_fil, n_col);
 
-    mou_pilota(f_pal, c_pal, m_pal, pos_f, pos_c, vel_f, vel_c, ball_id);
+    mou_pilota(pos_f, pos_c, vel_f, vel_c, ball_id);
     return 0;
 }
