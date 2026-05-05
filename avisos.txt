@@ -1,0 +1,15 @@
+Després de revisar i analitzar diverses de les pràctiques que heu lliurat corresponents a les primeres fases, he detectat un patró d'errors conceptuals i males pràctiques molt comuns. Us demano que llegiu amb atenció aquests punts i reviseu el vostre codi, ja que l'arquitectura concurrent perd tot el sentit si no s'aplica correctament:
+
+1. Seccions Crítiques massa grans: Teniu seccions crítiques que no són mínimes. Esteu executant de manera protegida molt més codi del necessari. La norma és clara: obriu el semàfor, feu exclusivament l'operació sobre la variable/pantalla compartida, i tanqueu-lo ràpidament.
+
+2. Excés de Sincronització (Bloquejos dins la Secció Crítica): Això és un error greu de disseny. Hem vist codis on s'espera un temps (win_retard()) o, pitjor encara, es fan crides d'espera/bloquejants a dins de la secció crítica. Si el procés pare tanca el semàfor i es posa a esperar un esdeveniment, cap pilota es podrà moure ni dibuixar. La lògica d'espera s'ha de fer sempre a fora.
+
+3. Ús incorrecte dels semàfors: Alguns utilitzeu un únic semàfor per a tot. No té res a veure la protecció per a un accés segur a la llibreria gràfica (curses) amb la protecció de l'accés a variables compartides de la lògica del joc. Necessiteu mecanismes separats. A més, a alguns us falta protegir l'accés a determinades rutines de curses.
+
+4. Avaluació ineficient de l'estat del joc (Escaneig de la pantalla): He vist que alguns controleu si la partida s'ha acabat recorrent tota la matriu de la pantalla amb dobles bucles for buscant lletres o blocs. Escanejar tota la pantalla a cada iteració consumeix molts recursos innecessàriament. L'estat del joc s'ha de controlar mitjançant variables a la memòria compartida (per exemple, comptadors de blocs_restants i pilotes_vives).
+
+5. Finalització natural dels processos (No mateu els fills!): No podeu matar els processos utilitzant el senyal kill() des del procés pare. L'arquitectura ha d'estar dissenyada perquè els processos rebin la condició d'acabar per ells mateixos de manera neta (sortint del bucle i fent un exit() o return). Aprofito per recordar que no heu de tenir bucles infinits com while (1) per després fer un break; heu de programar de manera estructurada amb condicions clares al capçal.
+
+6. Sincronització de la finalització: El pare té l'obligació estricta d'esperar que TOTS els seus fills hagin acabat abans de tancar-se definitivament, no cal fer-ho dins del bucle principal. Recordeu que el número de processos només està limitat pels blocs que en trencar-se creen un procés (per defecte, el número de lletres de l'abecedari). Sota cap concepte podeu alliberar els recursos IPC del sistema si encara queda alguna pilota viva executant-se.
+
+7. Alliberar els recursos IPC: Si els processos no acaben bé, els semàfors, la memòria compartida i les bústies es queden residents al nucli del Sistema Operatiu. Assegureu-vos que el vostre programa els allibera tots abans de tancar.

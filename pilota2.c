@@ -39,6 +39,19 @@
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
 
+/* Struct de tipus Paleta */
+typedef struct {
+	int fila;
+	int col_inicial;
+	int col_actual;
+	int dir_lateral;
+	int dir_vertical;
+    int salt_vertical;
+	int amplada;
+	int id;
+	pthread_t thread_id;
+} paleta_t;
+
 /* Text d'ajuda que es mostra si s'executa el programa sense arguments */
 char *descripcio[] = {
 	"\n",
@@ -73,18 +86,24 @@ char *descripcio[] = {
 int n_fil, n_col;		/* dimensions del camp de joc */
 int m_por;			    /* mida de la porteria (en caracters) */
 int nblocs;         /* nombre de blocs restants per trencar */
+int n_pal;      /* nombre de paletes en joc */
 int retard;			    /* valor del retard de moviment, en mil.lisegons */
 char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla */
 
 /* Variables globals per a la memòria compartida (IPC) i semàfors */
 int id_mem;             /* identificador de la memòria compartida creada */
-int id_sem;             /* identificador del semàfor */
-void *p_mem;            /* punter cap a la zona de memòria mapejada */
+int id_sem_curses;      /* identificador del semàfor de curses */
+int id_sem_memoria;     /* identificador del semàfor de memòria */
 int id_mis;
+
+void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int *p_nblocs;          /* punter al comptador de blocs compartit */
 int *p_npilotes;        /* punter al comptador de pilotes compartit */
+paleta_t *p_paletes;    /* punter al vector de paletes a memòria compartida */
+
 int nblocs_offset;      /* desplaçament del comptador de blocs a memòria compartida */
 int npilotes_offset;    /* desplaçament del comptador de pilotes a memòria compartida */
+int paletes_offset;     /* desplaçament del vector de paletes a memòria compartida */
 
 /* Prototipus de funcions */
 char comprovar_bloc(int f, int c);
@@ -128,14 +147,12 @@ char comprovar_bloc(int f, int c)
 /* * Crea un nou procés pilota en la posició indicada amb la velocitat invertida.
  * Retorna 0 si s'ha creat correctament, -1 si hi ha error.
  */
-int crear_nova_pilota(int f_bloc, int c_bloc, int c_pal, int m_pal, float vel_f, float vel_c, int retard, char ball_id)
+int crear_nova_pilota(int f_bloc, int c_bloc, float vel_f, float vel_c, int retard, char ball_id)
 {
     missatge_t msg;
 
     msg.fila = f_bloc;
     msg.columna = c_bloc;
-    msg.c_pal = c_pal;
-    msg.m_pal = m_pal;
     msg.vel_f = -vel_f;
     msg.vel_c = -vel_c;
     msg.retard = retard;
@@ -171,13 +188,14 @@ int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
 	char rh, rv, rd;
 	int fora = 0; /* Booleà: indica si la pilota ha caigut per la porteria */
 	char tipus_bloc;  /* Per guardar el tipus de bloc impactat */
+    char ha_sortit = 0;
 
 	//posicio inicial de la pilota (enter)
 	f_pil= (int)pos_f;
 	c_pil= (int)pos_c;
 
 	/* Bucle infinit mentre la pilota estigui en joc */
-    while (1) {
+    while (!ha_sortit) {
 
 		/* Calcular següent posició */
 		f_h = pos_f + vel_f;
@@ -189,52 +207,69 @@ int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
 
 			/* Comprovar rebot vertical (sostre, paleta, o bloc a dalt/baix) */
 			if (f_h != f_pil) {
-               	waitS(id_sem);
+               	waitS(id_sem_curses);
                 rv = win_quincar(f_h, c_pil);
-                signalS(id_sem);
                 if (rv != ' ') {
-                    waitS(id_sem);
+                    waitS(id_sem_memoria);
                     tipus_bloc = comprovar_bloc(f_h, c_pil);
-                    signalS(id_sem);
+                    signalS(id_sem_memoria);
                     /* Si és bloc 'B', crear nova pilota */
                     if (tipus_bloc == BLKCHAR) {
                         /* Crear nova pilota a la posició del bloc amb velocitat invertida */
-                        crear_nova_pilota(f_h, c_pil, c_pal, m_pal, vel_f, vel_c, retard, ball_id);
+                        crear_nova_pilota(f_h, c_pil, vel_f, vel_c, retard, ball_id);
                     }
 
-                    if (rv == '0')
-                        vel_c = control_impacte2(c_pil, vel_c, c_pal, m_pal);
+                    if (rv == '0'){
+                        /* veure paleta amb la què impacta */
+                        char paleta_trobada = 0;
+                        int i = 0;
+                        waitS(id_sem_memoria);
+                        while (!paleta_trobada && i < n_pal) {
+                            if (p_paletes[i].fila == f_h && c_pil >= p_paletes[i].col_actual && c_pil < p_paletes[i].col_actual + p_paletes[i].amplada) {
+                                vel_c = control_impacte2(c_pil, vel_c, p_paletes[i].col_actual, p_paletes[i].amplada);
+                                paleta_trobada = 1;
+                            }
+                            i++;
+                        }
+                        signalS(id_sem_memoria);
+                    
+                    }
                     vel_f = -vel_f;
                     f_h = pos_f + vel_f;
                 }
+                signalS(id_sem_curses);
             }
 
 			/* Comprovar rebot horitzontal (parets laterals o costats dels blocs) */
 			if (c_h != c_pil) {
-			    waitS(id_sem);
+			    waitS(id_sem_curses);
                 rh = win_quincar(f_pil, c_h);
                 if (rh != ' ') {
+                    waitS(id_sem_memoria);
                     tipus_bloc = comprovar_bloc(f_pil, c_h);
+                    signalS(id_sem_memoria);
 
                     if (tipus_bloc == BLKCHAR) {
-                        crear_nova_pilota(f_pil, c_h, c_pal, m_pal, vel_f, vel_c, retard, ball_id);
+                        crear_nova_pilota(f_pil, c_h, vel_f, vel_c, retard, ball_id);
                     }
 
                     vel_c = -vel_c;
                     c_h = pos_c + vel_c;
                 }
-                signalS(id_sem);
+                signalS(id_sem_curses);
             }
 
 			/* Comprovar rebot diagonal (caires de les estructures) */
 			if ((f_h != f_pil) && (c_h != c_pil)) {
-                waitS(id_sem);
+                waitS(id_sem_curses);
                 rd = win_quincar(f_h, c_h);
                 if (rd != ' ') {
+                    waitS(id_sem_memoria);
                     tipus_bloc = comprovar_bloc(f_h, c_h);
+                    signalS(id_sem_memoria);
 
                     if (tipus_bloc == BLKCHAR) {
-                        crear_nova_pilota(f_h, c_h, c_pal, m_pal, vel_f, vel_c, retard, ball_id);
+                        crear_nova_pilota(f_h, c_h, vel_f, vel_c, retard, ball_id);
                     }
 
                     vel_f = -vel_f;
@@ -242,11 +277,11 @@ int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
                     f_h = pos_f + vel_f;
                     c_h = pos_c + vel_c;
                 }
-                signalS(id_sem);
+                signalS(id_sem_curses);
             }
 
 			/* Si l'espai està lliure, moure la pilota i redibuixar */
-			waitS(id_sem);
+			waitS(id_sem_curses);
 			if (win_quincar(f_h, c_h) == ' ') {
 				win_escricar(f_pil, c_pil, ' ', NO_INV);
 				pos_f += vel_f;
@@ -258,7 +293,7 @@ int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
 				if (f_pil != n_fil - 1) win_escricar(f_pil, c_pil, ball_id, INVERS);
 				else fora = 1;
 			}
-			signalS(id_sem);
+			signalS(id_sem_curses);
 		} else {
 			/* Encara que no canviï de quadrat a la pantalla, actualitzem coordenades reals */
 			pos_f += vel_f;
@@ -267,22 +302,22 @@ int mou_pilota(float pos_f, float pos_c, float vel_f, float vel_c, char ball_id)
 
 		/* Si la pilota ha sortit, sortir del bucle */
         if (fora) {
-            waitS(id_sem);
+            waitS(id_sem_memoria);
             if (p_npilotes != NULL && *p_npilotes > 0) {
                 (*p_npilotes)--; /* Decrementem el nombre de pilotes en joc */
             }
-            signalS(id_sem);
-            break;
+            signalS(id_sem_memoria);
+            ha_sortit = 1;
         };
 
         /* Pausa per controlar la velocitat */
         win_retard(retard);
     }
 
-    waitS(id_sem);
+    waitS(id_sem_curses);
     /* Netejar la pilota de la pantalla abans de sortir */
     win_escricar(f_pil, c_pil, ' ', NO_INV);
-    signalS(id_sem);
+    signalS(id_sem_curses);
     return 1;  /* La pilota ha sortit */
 }
 
@@ -292,31 +327,33 @@ int main(int n_args, char *ll_args[])
     float pos_f, pos_c, vel_f, vel_c;
     char ball_id;
 
-    /* Comprovació d'arguments: esperem 14 arguments + nom del programa */
-    /* Format: id_mem id_sem id_mis n_fil n_col m_por pos_f pos_c vel_f vel_c ball_id retard nblocs_offset paletes_offset */
-    if (n_args != 15) {
+    /* Comprovació d'arguments: esperem 17 arguments + nom del programa */
+    /* Format: id_mem id_sem_curses id_sem_memoria id_mis n_fil n_col n_pal m_por pos_f pos_c vel_f vel_c ball_id retard nblocs_offset paletes_offset */
+    if (n_args != 18) {
         fprintf(stderr, "Error: Nombre d'arguments incorrecte\n");
-        fprintf(stderr, "Ús: pilota2 id_mem id_sem id_mis n_fil n_col m_por pos_f pos_c vel_f vel_c ball_id retard nblocs_offset paletes_offset\n");
+        fprintf(stderr, "Ús: pilota2 id_mem id_sem_curses id_sem_memoria id_mis n_fil n_col n_pal m_por pos_f pos_c vel_f vel_c ball_id retard nblocs_offset paletes_offset\n");
         fprintf(stderr, "Arguments detectats: %d\n", n_args);
         exit(1);
     }
 
     /* Llegir arguments de la línia de comandes */
     id_mem = atoi(ll_args[1]);
-    id_sem = atoi(ll_args[2]);
-    id_mis = atoi(ll_args[3]);
-    n_fil = atoi(ll_args[4]);
-    n_col = atoi(ll_args[5]);
-    m_por = atoi(ll_args[6]);
-    pos_f = atof(ll_args[7]);      /* Posició fila inicial de la pilota */
-    pos_c = atof(ll_args[8]);     /* Posició columna inicial de la pilota */
-    vel_f = atof(ll_args[9]);     /* Velocitat fila */
-    vel_c = atof(ll_args[10]);     /* Velocitat columna */
-    ball_id = ll_args[11][0];      /* Caràcter identificador de la pilota */
-    retard = atoi(ll_args[12]);    /* Retard entre moviments */
-    nblocs_offset = atoi(ll_args[13]); /* Offset del nombre de blocs restants */
-    npilotes_offset = atoi(ll_args[14]); /* Offset del nombre de pilotes en joc */
-    paletes_offset = atoi(ll_args[15]); /* Offset del nombre de paletes en joc */
+    id_sem_curses = atoi(ll_args[2]);
+    id_sem_memoria = atoi(ll_args[3]);
+    id_mis = atoi(ll_args[4]);
+    n_fil = atoi(ll_args[5]);
+    n_col = atoi(ll_args[6]);
+    n_pal = atoi(ll_args[7]);
+    m_por = atoi(ll_args[8]);
+    pos_f = atof(ll_args[9]);      /* Posició fila inicial de la pilota */
+    pos_c = atof(ll_args[10]);     /* Posició columna inicial de la pilota */
+    vel_f = atof(ll_args[11]);     /* Velocitat fila */
+    vel_c = atof(ll_args[12]);     /* Velocitat columna */
+    ball_id = ll_args[13][0];      /* Caràcter identificador de la pilota */
+    retard = atoi(ll_args[14]);    /* Retard entre moviments */
+    nblocs_offset = atoi(ll_args[15]); /* Offset del nombre de blocs restants */
+    npilotes_offset = atoi(ll_args[16]); /* Offset del nombre de pilotes en joc */
+    paletes_offset = atoi(ll_args[17]); /* Offset del nombre de paletes en joc */
 
     /* Connectar a la memòria compartida */
     p_mem = map_mem(id_mem);
@@ -328,6 +365,7 @@ int main(int n_args, char *ll_args[])
     /* Inicialitzar punters als comptadors compartits */
     p_nblocs = (int *)((char *)p_mem + nblocs_offset);
     p_npilotes = (int *)((char *)p_mem + npilotes_offset);
+    p_paletes = (paleta_t *)((char *)p_mem + paletes_offset);
 
     win_set(p_mem, n_fil, n_col);
 

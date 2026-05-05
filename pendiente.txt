@@ -1,0 +1,36 @@
+Estado actual de mur3.c
+
+Lo más importante ya quedó encaminado: `p_paletes` pasó a ser global y ya puede compartirse entre `main()` e `inicialitza_joc()`. La lógica de colisión con `win_quincar()` también está mejor planteada que al inicio. Aun así, el archivo sigue teniendo varios puntos que conviene cerrar antes de darlo por bueno.
+
+1. Alinear `mur3.c` con el contrato real de `pilota2`
+Importancia: muy alta.
+Problema: en `mur3.c` se está llamando a `execlp("./pilota2", ...)` con más argumentos de los que `pilota2.c` parece esperar. Eso puede desplazar los parámetros y romper la lectura de offsets y coordenadas.
+Idea limpia: revisar primero la firma real de `pilota2` y dejar ambos lados con el mismo orden y número exacto de argumentos. Si hace falta más información compartida, usar memoria compartida o un struct serializado, no añadir otro parámetro al final sin actualizar el receptor.
+
+2. Unificar el modelo de estado de la paleta
+Importancia: muy alta.
+Problema: `mur3.c` mezcla el modelo nuevo de paletas compartidas con restos del modelo anterior (`c_pal`, `m_pal`, `f_pal`, `dirPaleta`). Eso crea incoherencias entre la paleta del usuario, las paletas compartidas y lo que se pinta en pantalla.
+Idea limpia: decidir un único modelo. Si las paletas ahora viven en `p_paletes`, entonces toda lectura y escritura de posición, ancho y dirección debería salir de ahí. Si alguna paleta sigue siendo la principal, declarar claramente su estado y no duplicarlo en variables sueltas.
+
+3. Revisar la arquitectura de entrada de teclado
+Importancia: alta.
+Problema: cada `mou_paleta_thread()` llama a `win_gettec()`, pero el bucle principal también lee teclado. Eso hace difícil saber qué parte controla de verdad el movimiento y puede hacer que un hilo robe eventos a otro.
+Idea limpia: separar responsabilidades. O bien el hilo solo actualiza movimiento a partir de un estado compartido, y el teclado lo gestiona un único sitio; o bien el teclado se procesa fuera y los hilos solo aplican desplazamientos. No mezclar ambos enfoques.
+
+4. Hacer la detección de colisiones más robusta
+Importancia: media-alta.
+Problema: `win_quincar()` sirve como comprobación rápida de ocupación, pero depende del dibujo actual de la pantalla. Detecta cualquier carácter, no solo paletas, y puede volverse frágil si cambian los símbolos del tablero.
+Idea limpia: para chocar con otras paletas, comparar intervalos usando `p_paletes[i].fila`, `col_actual` y `amplada`. Usar `win_quincar()` solo como comprobación auxiliar de muro u obstáculo visual, no como lógica principal de juego.
+
+5. Verificar coherencia de nombres y campos
+Importancia: media.
+Problema: en la evolución del fichero se han mezclado nombres distintos para la misma idea (`mida` vs `amplada`, variables compartidas vs locales). Aunque algunas partes ya se corrigieron, la consistencia sigue siendo frágil.
+Idea limpia: mantener una convención única. Para este fichero, `amplada` debe ser el único nombre del ancho de la paleta, y toda validación/pintado debe usar ese mismo campo.
+
+Resumen prácticodir_
+Si tuviera que ordenar el trabajo:
+1) fijar el contrato con `pilota2`,
+2) decidir un único modelo de estado para las paletas,
+3) separar teclado y movimiento,
+4) dejar la colisión entre paletas por intervalos y no por pantalla,
+5) rematar consistencia de nombres.

@@ -45,3 +45,13 @@ typedef struct {
     float vel_c;
     int retard;
 } missatge_t;
+
+// Definicio del missatge usat a fase 3
+typedef struct {
+    int tipus; // Control o nova pilota
+    int fila;
+    int columna;
+    float vel_f;
+    float vel_c;
+    int retard;
+} missatge_t_2;
