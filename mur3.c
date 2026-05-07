@@ -109,9 +109,11 @@ void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
 int npilotes_offset;	  /* offset dins de la memòria compartida on es guarda el nombre de pilotes en joc */
 int paletes_offset; 	/* offset dins de la memòria compartida on es guarda la informació de les paletes */
+int final_joc_offset;   /* offset dins de la memòria compartida on es guarda la bandera de fi */
 int *p_npilotes; 		/* punter al comptador de pilotes compartit */
 int *p_nblocs;          /* punter al comptador de blocs compartit */
 paleta_t *p_paletes;    /* punter a la llista de paletes a la memòria compartida */
+int *p_final_joc;       /* punter a la bandera compartida de fi de joc */
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
@@ -123,7 +125,7 @@ int n_pilotes_processos = 0;
 volatile int final_joc = 0; // variable volatile per què el compilador no optimitzi les comprovacions dins del bucle dels fils
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], n_pal_s[20], m_por_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20], paletes_offset_s[20];
+char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], n_pal_s[20], m_por_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20], paletes_offset_s[20], final_joc_offset_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -198,8 +200,10 @@ int inicialitza_joc(void)
 	nblocs_offset = mida_mem; // reservem espai després del buffer de la pantalla
 	npilotes_offset = mida_mem + sizeof(int); // reservem espai per un int més (npilotes)
 	paletes_offset = mida_mem + 2*sizeof(int); // reservem espai per un int més (paletes)
+	final_joc_offset = mida_mem + 2*sizeof(int) + sizeof(paleta_t) * n_paletes; // bandera de fi al final
 	mida_mem += sizeof(int); // sumem 4 bytes per nblocs
 	mida_mem += sizeof(int); // sumem 4 bytes per npilotes
+	mida_mem += sizeof(int); // sumem 4 bytes per la bandera de fi
 	mida_mem += sizeof(paleta_t) * n_paletes; // sumem espai per les paletes
 	
 	/* Creació i assignació de la memòria compartida per a la pantalla */
@@ -214,6 +218,8 @@ int inicialitza_joc(void)
 	*p_npilotes = 0;
 
 	p_paletes = (paleta_t *)((char *)p_mem + paletes_offset);
+	p_final_joc = (int *)((char *)p_mem + final_joc_offset);
+	*p_final_joc = 0;
 	for (i = 0; i < n_paletes; i++) {
 		p_paletes[i] = paletes[i]; // Copiem la informació de les paletes a la memòria compartida
 		p_paletes[i].id = paletes[i].id; // Assegurem que l'ID de la paleta es manté
@@ -477,7 +483,7 @@ void processa_bustia_no_blocant(void) {
 			sprintf(retard_s, "%d", missatge.retard);
 			sprintf(nblocs_offset_s, "%d", nblocs_offset);
 			sprintf(npilotes_offset_s, "%d", npilotes_offset);
-			sprintf(paletes_offset_s, "%d", paletes_offset);
+			sprintf(final_joc_offset_s, "%d", final_joc_offset);
 
 			sprintf(id_mis_s, "%d", id_mis);
 
@@ -485,7 +491,7 @@ void processa_bustia_no_blocant(void) {
 			if (pid_pilotes[n_pilotes_processos] == 0)
 			{
 				/* Execució de ./pilota2 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 				exit(1);
 			}
 			if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -569,7 +575,7 @@ int main(int n_args, char *ll_args[])
     sprintf(retard_s, "%d", retard);
 	sprintf(nblocs_offset_s, "%d", nblocs_offset);
 	sprintf(npilotes_offset_s, "%d", npilotes_offset);
-	sprintf(paletes_offset_s, "%d", paletes_offset);
+	sprintf(final_joc_offset_s, "%d", final_joc_offset);
 
 	/* Creació dels threads per a les paletes */
 	for (int i = 0; i < n_paletes; i++) {
@@ -581,7 +587,7 @@ int main(int n_args, char *ll_args[])
 	if (pid_pilotes[n_pilotes_processos] == 0)
 	{
 		/* Execució de ./pilota2 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
+			execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 		exit(1);
 	}
 	if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -624,33 +630,32 @@ int main(int n_args, char *ll_args[])
 		fi2 = (*p_nblocs == 0);
 	} while (!fi2 && *p_npilotes > 0 && !final_joc);
 	
+	waitS(id_sem_memoria);
+	*p_final_joc = 1;
+	signalS(id_sem_memoria);
 	final_joc = 1;
 	for (int i = 0; i < n_paletes; i++) {
 		pthread_join(p_paletes[i].thread_id, NULL);
 	}
 
-	// Finalitzar tots els processos pilota
-	for (int i = 0; i < n_pilotes_processos; i++) {
-    if (pid_pilotes[i] > 0) {
-        kill(pid_pilotes[i], SIGTERM);
-    }
-}
-
-	while (wait(NULL) > 0) {
-		/* Esperem que acabin tots els fills abans d'alliberar IPC */
-	}
-
+	
 	sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
 	mostra_final(missatge_final);
 	if (fi2==1) {
 		mostra_final("Has guanyat!");
 		printf("Has guanyat!\n");
 	}
-	if (*p_npilotes == 0) {
+	if (!final_joc && *p_npilotes == 0) {
 		mostra_final("Has perdut!");
 		printf("Has perdut!\n");
 	}
-
+	
+	/* Esperem la finalització natural dels processos pilota */
+	for (int i = 0; i < n_pilotes_processos; i++) {
+		if (pid_pilotes[i] > 0) {
+			waitpid(pid_pilotes[i], NULL, 0);
+		}
+	}
 	win_fi();
 	elim_mem(id_mem);
 	elim_sem(id_sem_curses);

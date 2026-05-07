@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
 #include "winsuport2.h"
 #include "memoria.h"
 #include "semafor.h"
@@ -92,14 +94,20 @@ int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
 int npilotes_offset;	  /* offset dins de la memòria compartida on es guarda el nombre de pilotes en joc */
+int final_joc_offset;    /* offset dins de la memòria compartida on es guarda la bandera de fi */
 int *p_npilotes; 		/* punter al comptador de pilotes compartit */
 int *p_nblocs;          /* punter al comptador de blocs compartit */
+int *p_final_joc;       /* punter a la bandera compartida de fi de joc */
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20];
+char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20], final_joc_offset_s[20];
+
+/* PIDs */
+pid_t pid_pilotes[MAXBALLS];
+int n_pilotes_processos = 0;
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -162,8 +170,10 @@ int inicialitza_joc(void)
 
 	nblocs_offset = mida_mem; // reservem espai després del buffer de la pantalla
 	npilotes_offset = mida_mem + sizeof(int); // reservem espai per un int més (npilotes)
+	final_joc_offset = mida_mem + 2*sizeof(int); // reservem espai per la bandera de fi
 	mida_mem += sizeof(int); // sumem 4 bytes per nblocs
 	mida_mem += sizeof(int); // sumem 4 bytes per npilotes
+	mida_mem += sizeof(int); // sumem 4 bytes per la bandera de fi
 
     /* Creació i assignació de la memòria compartida per a la pantalla */
 	id_mem = ini_mem(mida_mem);
@@ -175,6 +185,9 @@ int inicialitza_joc(void)
 
 	p_npilotes = (int *)((char *)p_mem + npilotes_offset);
 	*p_npilotes = 0;
+
+	p_final_joc = (int *)((char *)p_mem + final_joc_offset);
+	*p_final_joc = 0;
 
     /* Càlcul de la porteria inferior */
 	if (m_por > n_col - 2) m_por = n_col - 2;
@@ -351,6 +364,7 @@ void processa_bustia_no_blocant(void) {
 			sprintf(retard_s, "%d", missatge.retard);
 			sprintf(nblocs_offset_s, "%d", nblocs_offset);
 			sprintf(npilotes_offset_s, "%d", npilotes_offset);
+			sprintf(final_joc_offset_s, "%d", final_joc_offset);
 
 			sprintf(id_mis_s, "%d", id_mis);
 
@@ -358,7 +372,7 @@ void processa_bustia_no_blocant(void) {
 			if (pid == 0)
 			{
 				/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 				exit(1);
 			}
 			if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -442,20 +456,22 @@ int main(int n_args, char *ll_args[])
     sprintf(retard_s, "%d", retard);
 	sprintf(nblocs_offset_s, "%d", nblocs_offset);
 	sprintf(npilotes_offset_s, "%d", npilotes_offset);
+	sprintf(final_joc_offset_s, "%d", final_joc_offset);
 	
 	/* 4. Creació del procés fill per a la pilota */
-	pid_t pid = fork();
-	if (pid == 0)
+	pid_pilotes[n_pilotes_processos] = fork();
+	if (pid_pilotes[n_pilotes_processos] == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
+			execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 		exit(1);
 	}
-	if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
+	if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
 		waitS(id_sem_memoria);
 		(*p_npilotes)++;
 		signalS(id_sem_memoria);
 		ball_id++;
+		n_pilotes_processos++;
 	}
 	do
 	{
@@ -467,15 +483,24 @@ int main(int n_args, char *ll_args[])
 		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
 		fi2 = (*p_nblocs == 0);
 	} while (!fi1 && !fi2 && *p_npilotes > 0);
+
+	waitS(id_sem_memoria);
+	*p_final_joc = 1;
+	signalS(id_sem_memoria);
 	sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
+
 	mostra_final(missatge_final);
 	if (fi2==1) {
 		mostra_final("Has guanyat!");
 		printf("Has guanyat!\n");
 	}
-	if (*p_npilotes == 0) {
+	if (!fi1 && *p_npilotes == 0) {
 		mostra_final("Has perdut!");
 		printf("Has perdut!\n");
+	}
+
+	while (wait(NULL) > 0) {
+		/* Esperem la finalització natural dels fills */
 	}
 
 	win_fi();
