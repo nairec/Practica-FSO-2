@@ -83,6 +83,7 @@ char *descripcio[] = {
 /* --- Variables Globals --- */
 /* Variables de l'entorn de joc */
 int n_fil, n_col;		/* dimensions del camp de joc */
+int c_pal, m_pal;
 int m_por;			    /* mida de la porteria (en caracters) */
 int nblocs = 0;         /* nombre de blocs restants per trencar */
 int retard;			    /* valor del retard de moviment, en mil.lisegons */
@@ -122,7 +123,7 @@ int n_pilotes_processos = 0;
 volatile int final_joc = 0; // variable volatile per què el compilador no optimitzi les comprovacions dins del bucle dels fils
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], n_pal_s[20], m_por_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20], paletes_offset_s[20];
+char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], n_pal_s[20], m_por_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20], paletes_offset_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -133,6 +134,7 @@ int carrega_configuracio(FILE * fit)
 	int i = 0;
 
 	fscanf(fit, "%d %d %d\n", &n_fil, &n_col, &m_por);
+	fscanf(fit, "%d %d\n",    &c_pal, &m_pal);
 	fscanf(fit, "%f %f %f %f\n", &pos_f, &pos_c, &vel_f, &vel_c);
 
 	/* Llegim files començant amb el caràcter P per inicialitzar les paletes*/
@@ -464,8 +466,9 @@ void processa_bustia_no_blocant(void) {
 			sprintf(id_sem_memoria_s, "%d", id_sem_memoria);
 			sprintf(n_fil_s, "%d", n_fil);
 			sprintf(n_col_s, "%d", n_col);
-			sprintf(n_pal_s, "%d", n_paletes);
 			sprintf(m_por_s, "%d", m_por);
+			sprintf(c_pal_s, "%d", c_pal);
+			sprintf(m_pal_s, "%d", m_pal);
 			sprintf(pos_f_s, "%f", (float)missatge.fila);
 			sprintf(pos_c_s, "%f", (float)missatge.columna);
 			sprintf(vel_f_s, "%f", missatge.vel_f);
@@ -482,7 +485,7 @@ void processa_bustia_no_blocant(void) {
 			if (pid_pilotes[n_pilotes_processos] == 0)
 			{
 				/* Execució de ./pilota2 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, n_pal_s, m_por_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
 				exit(1);
 			}
 			if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -555,8 +558,9 @@ int main(int n_args, char *ll_args[])
     sprintf(id_mis_s, "%d", id_mis);
     sprintf(n_fil_s, "%d", n_fil);
     sprintf(n_col_s, "%d", n_col);
-    sprintf(n_pal_s, "%d", n_paletes);
     sprintf(m_por_s, "%d", m_por);
+	sprintf(c_pal_s, "%d", c_pal);
+	sprintf(m_pal_s, "%d", m_pal);
     sprintf(pos_f_s, "%f", pos_f);
     sprintf(pos_c_s, "%f", pos_c);
     sprintf(vel_f_s, "%f", vel_f);
@@ -577,7 +581,7 @@ int main(int n_args, char *ll_args[])
 	if (pid_pilotes[n_pilotes_processos] == 0)
 	{
 		/* Execució de ./pilota2 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, n_pal_s,m_por_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, paletes_offset_s, (char *)NULL);
 		exit(1);
 	}
 	if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota

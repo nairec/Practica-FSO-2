@@ -86,7 +86,8 @@ float vel_f, vel_c;		/* velocitat de la pilota (components horitzontal i vertica
 
 /* Variables globals per a la memòria compartida (IPC) i semàfors */
 int id_mem;             /* identificador de la memòria compartida creada */
-int id_sem;             /* identificador del semàfor */
+int id_sem_curses;      /* identificador del semàfor de curses */
+int id_sem_memoria;     /* identificador del semàfor de memòria */
 int id_mis;				/* identificador de la bustia */
 void *p_mem;            /* punter cap a la zona de memòria mapejada */
 int nblocs_offset;       /* offset dins de la memòria compartida on es guarda el nombre de blocs restants */
@@ -98,7 +99,7 @@ int *p_nblocs;          /* punter al comptador de blocs compartit */
 int milisegons = 0, segons = 0, minuts = 0;
 
 /* Variables per a la conversió de valors a cadenes */
-char id_mem_s[20], id_sem_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20];
+char id_mem_s[20], id_sem_curses_s[20], id_sem_memoria_s[20], id_mis_s[20],n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20], nblocs_offset_s[20], npilotes_offset_s[20];
 
 /* * Llegeix els paràmetres del joc des d'un fitxer de text.
  * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
@@ -262,20 +263,20 @@ int mou_paleta(void)
 	tecla = win_gettec();
 	if (tecla != 0) {
 		if ((tecla == TEC_DRETA) && ((c_pal + m_pal) < n_col - 1)) {
-		    	waitS(id_sem);
+		    	waitS(id_sem_curses);
                 /* Esborrar l'extrem esquerre i pintar el nou extrem dret */
 				win_escricar(f_pal, c_pal, ' ', NO_INV);
 				c_pal++;
 				win_escricar(f_pal, c_pal + m_pal - 1, '0', INVERS);
-				signalS(id_sem);
+				signalS(id_sem_curses);
 		}
 		if ((tecla == TEC_ESQUER) && (c_pal > 1)) {
-		    	waitS(id_sem);
+		    	waitS(id_sem_curses);
                 /* Esborrar l'extrem dret i pintar el nou extrem esquerre */
 				win_escricar(f_pal, c_pal + m_pal - 1, ' ', NO_INV);
 				c_pal--;
 				win_escricar(f_pal, c_pal, '0', INVERS);
-				signalS(id_sem);
+				signalS(id_sem_curses);
 		}
 		if (tecla == TEC_RETURN) result = 1; /* L'usuari vol sortir */
 		dirPaleta = tecla;
@@ -296,9 +297,9 @@ void actualitza_temps(void)
 	}
 	char temps[20];
 	sprintf(temps, "%02d:%02d", minuts, segons);
-	waitS(id_sem);
+	waitS(id_sem_curses);
 	win_escristr(temps);
-	signalS(id_sem);
+	signalS(id_sem_curses);
 }
 
 static char id_pilota_visible(int id)
@@ -335,13 +336,13 @@ void processa_bustia_no_blocant(void) {
 			id_char = id_pilota_visible(ball_id);
 
 			sprintf(id_mem_s, "%d", id_mem);
-			sprintf(id_sem_s, "%d", id_sem);
+			sprintf(id_sem_curses_s, "%d", id_sem_curses);
+			sprintf(id_sem_memoria_s, "%d", id_sem_memoria);
 			sprintf(n_fil_s, "%d", n_fil);
 			sprintf(n_col_s, "%d", n_col);
 			sprintf(m_por_s, "%d", m_por);
 			sprintf(c_pal_s, "%d", missatge.c_pal);
 			sprintf(m_pal_s, "%d", m_pal);
-			sprintf(f_pal_s, "%d", n_fil - 2);
 			sprintf(pos_f_s, "%f", (float)missatge.fila);
 			sprintf(pos_c_s, "%f", (float)missatge.columna);
 			sprintf(vel_f_s, "%f", missatge.vel_f);
@@ -357,13 +358,13 @@ void processa_bustia_no_blocant(void) {
 			if (pid == 0)
 			{
 				/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
+				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
 				exit(1);
 			}
 			if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
-				waitS(id_sem);
+				waitS(id_sem_memoria);
 				(*p_npilotes)++;
-				signalS(id_sem);
+				signalS(id_sem_memoria);
 				ball_id++;
 			}
 		}
@@ -404,8 +405,9 @@ int main(int n_args, char *ll_args[])
 	printf("Joc del Mur: prem RETURN per continuar:\n");
 	getchar();
 	
-	/* 3. Inicialitzem el semàfor */
-	id_sem = ini_sem(1);
+	/* 3. Inicialitzem els semàfors */
+	id_sem_curses = ini_sem(1);
+	id_sem_memoria = ini_sem(1);
 	
 	/*3.1 Inicialitzem la bústia */
 	id_mis = ini_mis();
@@ -423,7 +425,8 @@ int main(int n_args, char *ll_args[])
 	id_char = id_pilota_visible(ball_id);
 	
     sprintf(id_mem_s, "%d", id_mem);
-    sprintf(id_sem_s, "%d", id_sem);
+    sprintf(id_sem_curses_s, "%d", id_sem_curses);
+	sprintf(id_sem_memoria_s, "%d", id_sem_memoria);
     sprintf(id_mis_s, "%d", id_mis);
     sprintf(n_fil_s, "%d", n_fil);
     sprintf(n_col_s, "%d", n_col);
@@ -445,13 +448,13 @@ int main(int n_args, char *ll_args[])
 	if (pid == 0)
 	{
 		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota2", "pilota2", id_mem_s, id_sem_s, id_mis_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
+		execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, (char *)NULL);
 		exit(1);
 	}
 	if (pid > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
-		waitS(id_sem);
+		waitS(id_sem_memoria);
 		(*p_npilotes)++;
-		signalS(id_sem);
+		signalS(id_sem_memoria);
 		ball_id++;
 	}
 	do
@@ -477,6 +480,7 @@ int main(int n_args, char *ll_args[])
 
 	win_fi();
 	elim_mem(id_mem);
-	elim_sem(id_sem);
+	elim_sem(id_sem_curses);
+	elim_sem(id_sem_memoria);
     elim_mis(id_mis);
 }
