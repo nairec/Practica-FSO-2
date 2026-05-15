@@ -35,6 +35,7 @@
 //controlar l'atribut invers en dibuixar (win_escricar)
 #define NO_INV 0
 #define INVERS 1
+#define MAX_VEL_F 2.0
 
 /* Constants per enviar missatges */
 #define TIPUS_CONTROL 1
@@ -376,6 +377,8 @@ void* bustia_thread(void* arg) {
 
         if (missatge.tipus == TIPUS_PILOTA_SACRIFICI) {
             vel_f += missatge.vel_f;
+            if (vel_f > MAX_VEL_F) vel_f = MAX_VEL_F;
+            if (vel_f < -MAX_VEL_F) vel_f = -MAX_VEL_F;
         }
         win_retard(retard);
     }

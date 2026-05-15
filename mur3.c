@@ -646,16 +646,18 @@ int main(int n_args, char *ll_args[])
 	}
 
 	
-	sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
 	mostra_final(missatge_final);
 	if (fi1==1) {
-		mostra_final("Partida abandonada!");
+		sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
 		printf("Partida abandonada!\n");
 	} else if (fi2==1) {
-		mostra_final("Has guanyat!");
+		sprintf(missatge_final, "Has guanyat! temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
 		printf("Has guanyat!\n");
 	} else if (*p_npilotes == 0) {
-		mostra_final("Has perdut!");
+		sprintf(missatge_final, "Has perdut! temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
 		printf("Has perdut!\n");
 	}
 	
