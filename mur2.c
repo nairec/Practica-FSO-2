@@ -1,12 +1,3 @@
-/*****************************************************************************/
-/* */
-/* mur2.c                                                                    */
-/* */
-/* Programa inicial d'exemple per a les practiques 2 d'FSO.                  */
-/* Versió seqüencial adaptada a winsuport2 i memòria compartida IPC.         */
-/* */
-/*****************************************************************************/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +11,7 @@
 
 /* --- Definicions de constants --- */
 #define MAX_THREADS	10
-#define MAXBALLS	(MAX_THREADS-1)
+#define MAXBALLS	50
 #define MIN_FIL	10
 #define MAX_FIL	50
 #define MIN_COL	10
@@ -50,7 +41,7 @@ char *descripcio[] = {
 	"\n",
 	"  Arguments del programa:\n",
 	"\n",
-	"       $ ./mur0 fitxer_config [retard]\n",
+	"       $ ./mur2 fitxer_config [retard]\n",
 	"\n",
 	"     El primer argument ha de ser el nom d\'un fitxer de text amb la\n",
 	"     configuracio de la partida, on la primera fila inclou informacio\n",
@@ -318,8 +309,8 @@ void actualitza_temps(void)
 static char id_pilota_visible(int id)
 {
 	/* Evitem '0', 'A' i 'B' perquè tenen significat especial al taulell */
-	if (id < 9) return (char)('1' + id);
-	return (char)('C' + ((id - 9) % ('Z' - 'C' + 1)));
+	if (id < 9) return (char)('a' + id);
+	return (char)('c' + ((id - 9) % ('z' - 'c' + 1)));
 }
 
 void processa_bustia_no_blocant(void) {
@@ -432,9 +423,6 @@ int main(int n_args, char *ll_args[])
 	/* 3.2 Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
 
-
-	/* Inicialització de punter a comptador de blocs*/
-	p_nblocs = (int *)((char *)p_mem + nblocs_offset);
 	/* Preparar arguments per passar a pilota2 */
 	id_char = id_pilota_visible(ball_id);
 	
@@ -484,19 +472,23 @@ int main(int n_args, char *ll_args[])
 		fi2 = (*p_nblocs == 0);
 	} while (!fi1 && !fi2 && *p_npilotes > 0);
 
+	int final_per_pilotes = (*p_npilotes == 0);
 	waitS(id_sem_memoria);
 	*p_final_joc = 1;
 	signalS(id_sem_memoria);
-	sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
-
-	mostra_final(missatge_final);
+	
 	if (fi2==1) {
-		mostra_final("Has guanyat!");
+		sprintf(missatge_final, "Has guanyat! temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
 		printf("Has guanyat!\n");
 	}
-	if (!fi1 && *p_npilotes == 0) {
-		mostra_final("Has perdut!");
+	else if (!fi1 && final_per_pilotes) {
+		sprintf(missatge_final, "Has perdut! temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
 		printf("Has perdut!\n");
+	} else {
+		sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
 	}
 
 	while (wait(NULL) > 0) {

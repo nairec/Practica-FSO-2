@@ -10,7 +10,7 @@ OBJS_COMUNS = winsuport2.o memoria.o semafor.o missatge.o
 LDFLAGS = -lcurses -lpthread
 
 # Objectius principals
-all: mur0 mur1 pilota1 mur2 pilota2 mur3
+all: mur0 mur1 pilota1 mur2 pilota2 mur3 mur4 pilota4
 
 # Rutines compartides (llibreria gràfica i IPC)
 winsuport2.o: winsuport2.c winsuport2.h
@@ -65,7 +65,20 @@ mur3.o: mur3.c winsuport2.h memoria.h semafor.h missatge.h
 mur3: mur3.o $(OBJS_COMUNS)
 	$(CC) -o mur3 mur3.o $(OBJS_COMUNS) $(LDFLAGS)
 
+# --- Fase 4 ---
+mur4.o: mur4.c winsuport2.h memoria.h semafor.h missatge.h
+	$(CC) $(CFLAGS) -c mur4.c -o mur4.o
+
+mur4: mur4.o $(OBJS_COMUNS)
+	$(CC) -o mur4 mur4.o $(OBJS_COMUNS) $(LDFLAGS)
+
+pilota4.o: pilota4.c winsuport2.h memoria.h semafor.h missatge.h
+	$(CC) $(CFLAGS) -c pilota4.c -o pilota4.o
+
+pilota4: pilota4.o $(OBJS_COMUNS)
+	$(CC) -o pilota4 pilota4.o $(OBJS_COMUNS) $(LDFLAGS)
+	
 # --- Neteja ---
 # Executar 'make clean' per esborrar binaris i fitxers objecte 
 clean:
-	rm -f *.o mur0 mur1 pilota1 mur2 pilota2 mur3
+	rm -f *.o mur0 mur1 pilota1 mur2 pilota2 mur3 mur4 pilota4

@@ -17,18 +17,24 @@
 #define MAX_FIL	50
 #define MIN_COL	10
 #define MAX_COL	80
+#define TEMPS_ACUMULACIO_PODER 5
 
 /* Constants per a la creació dels blocs del joc */
 #define BLKSIZE	3
 #define BLKGAP	2
 #define BLKCHAR 'B'
 #define WLLCHAR '#'
-#define FRNTCHAR 'A'
+#define FRNTCHAR 'T'
 #define LONGMISS	65
 
 /* COnstants per enviar missatges */
 #define TIPUS_CONTROL 1
 #define TIPUS_NOVA_PILOTA 2
+#define TIPUS_INCREMENT_PODER 3
+#define TIPUS_PODER_ACTIU 4
+#define TIPUS_PODER_NO_ACTIU 5
+#define TIPUS_PILOTA_SACRIFICI 6
+#define TIPUS_REGISTRE_PILOTA 7
 
 /* Struct de tipus Paleta */
 typedef struct {
@@ -55,7 +61,7 @@ char *descripcio[] = {
 	"\n",
 	"  Arguments del programa:\n",
 	"\n",
-	"       $ ./mur3 fitxer_config [retard]\n",
+	"       $ ./mur4 fitxer_config [retard]\n",
 	"\n",
 	"     El primer argument ha de ser el nom d\'un fitxer de text amb la\n",
 	"     configuracio de la partida, on la primera fila inclou informacio\n",
@@ -107,9 +113,17 @@ int *p_final_joc;       /* punter a la bandera compartida de fi de joc */
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
 
+/* Variables per controlar el poder */
+int temps_poder = 0; // segons
+int poder_actiu = 0; // boolean per controlar si el poder està actiu o no
+
 /* PIDs */
 pid_t pid_pilotes[MAXBALLS];
 int n_pilotes_processos = 0;
+
+/* Bústies */
+int id_busties_pilotes[MAXBALLS];
+int n_busties_pilotes = 0;
 
 volatile int final_joc = 0; // variable volatile per què el compilador no optimitzi les comprovacions dins del bucle dels fils
 
@@ -137,7 +151,6 @@ int carrega_configuracio(FILE * fit)
         paletes[i].salt_vertical = 0;
         i++;
     }
-	printf("Nombre de paletes: %d\n", i);
 	n_paletes = i;
 
 	 /* Si no hi ha línies P al fitxer, deixem n_paletes == 0 i crearem
@@ -162,6 +175,9 @@ int carrega_configuracio(FILE * fit)
 			ret = 5;
 			break;
 		}
+		paletes[j].col_actual = paletes[j].col_inicial;
+		paletes[j].dir_vertical = 1;
+		paletes[j].salt_vertical = 0;
 	}
 
 	if (ret != 0) {
@@ -186,29 +202,7 @@ int inicialitza_joc(void)
 	int i, mida_mem;
 	int i_port, f_port;
 	int c, nb, offset;
-	
-	/* Si no s'han definit paletes amb línies P, crear la paleta per defecte
-	   ara que ja tenim les dimensions i la mida de la porteria (params_auto). */
-	if (n_paletes == 0) {
-		if (m_pal == 0) m_pal = m_por / 2;
-		if (m_pal < 1) m_pal = 1;
-		if (c_pal == 0) c_pal = (n_col - m_pal) / 2;
-		paletes[0].fila = (n_fil > 2) ? (n_fil - 2) : 1;
-		paletes[0].col_inicial = c_pal;
-		paletes[0].col_actual = c_pal;  // Inicialitzar col_actual
-		paletes[0].amplada = m_pal;
-		paletes[0].dir_lateral = 1;
-		paletes[0].dir_vertical = -1;
-		paletes[0].salt_vertical = 0;
-		paletes[0].id = 1;
-		n_paletes = 1;
-	
-		if (m_pal < 1 || m_pal > n_col - 3 || c_pal < 1 || c_pal + m_pal > n_col - 1) {
-			fprintf(stderr, "Error en la configuracio automatica de la paleta: mida o posicio incorrectes\n");
-			return (6);
-		}
-	}
-	
+
     /* win_ini retorna la mida necessària de memòria per la configuració actual */
 	mida_mem = win_ini(&n_fil, &n_col, '+', INVERS);
 
@@ -237,7 +231,7 @@ int inicialitza_joc(void)
 
 	p_final_joc = (int *)((char *)p_mem + final_joc_offset);
 	*p_final_joc = 0;
-	
+
     /* Càlcul de la porteria inferior */
 	if (m_por > n_col - 2) m_por = n_col - 2;
 	if (m_por == 0) m_por = 3 * (n_col - 2) / 4;
@@ -250,6 +244,22 @@ int inicialitza_joc(void)
 
 	
 	/* Ubicar i dibuixar les paletes */
+	/* Si no s'han definit paletes amb línies P, crear la paleta per defecte
+	   ara que ja tenim les dimensions i la mida de la porteria (params_auto). */
+	if (n_paletes == 0) {
+		if (m_pal == 0) m_pal = m_por / 2;
+		if (m_pal < 1) m_pal = 1;
+		if (c_pal == 0) c_pal = (n_col - m_pal) / 2;
+		paletes[0].fila = (n_fil > 2) ? (n_fil - 2) : 1;
+		paletes[0].col_inicial = c_pal;
+		paletes[0].col_actual = c_pal;
+		paletes[0].amplada = m_pal;
+		paletes[0].dir_lateral = 1;
+		paletes[0].dir_vertical = -1;
+		paletes[0].salt_vertical = 0;
+		paletes[0].id = 1;
+		n_paletes = 1;
+	}
 	for (int p = 0; p < n_paletes; p++) {
 		char simbol = '0' + paletes[p].id; // Convertir ID a caràcter
 		for (int i = 0; i < paletes[p].amplada; i++) {
@@ -322,7 +332,7 @@ void* mou_paleta_thread(void *arg) {
 
 		/* Activem moviment vertical si es detecta tecla de la paleta */
 		waitS(id_sem_memoria);
-		char dir_lateral = paleta->dir_lateral; // Comencem amb la direcció actual
+		float dir_lateral = paleta->dir_lateral; // Comencem amb la direcció actual
 		char dir_vertical = paleta->dir_vertical;
 		int ampl = paleta->amplada;
 		int fila = paleta->fila;
@@ -336,6 +346,7 @@ void* mou_paleta_thread(void *arg) {
 		colisio_vertical = 0;
 		colisio_lateral = 0;
 		int mou_vertical = 0;
+		int colisioT = 0;
 		
 		/* Comprovar colisions en vertical */
 		if (salt_vertical && dir_vertical != 0) {
@@ -347,9 +358,11 @@ void* mou_paleta_thread(void *arg) {
 				for (int c = col_actual; c < col_actual + ampl && !colisio_vertical; c++) {
                     if (dir_vertical < 0) {
                         if (win_quincar(fila_seguent, c) != ' ') colisio_vertical = 1;
-                    } else {
-                        if (win_quincar(fila_seguent + 1, c) != ' ') colisio_vertical = 1;
-                    }
+						if (win_quincar(fila_seguent, c) == FRNTCHAR) colisioT = 1;
+					} else {
+						if (win_quincar(fila_seguent + 1, c) != ' ') colisio_vertical = 1;
+						if (win_quincar(fila_seguent + 1, c) == FRNTCHAR) colisioT = 1;
+					}
                 }
 				signalS(id_sem_curses);
 			}
@@ -367,11 +380,17 @@ void* mou_paleta_thread(void *arg) {
 				waitS(id_sem_curses);
 				if (dir_lateral == -1) {
 					if (win_quincar(fila, col_seguent) != ' ') colisio_lateral = 1;
+					if (win_quincar(fila, col_seguent) == FRNTCHAR) colisioT = 1;
 				} else if (dir_lateral == 1) {
 					if (win_quincar(fila, col_final) != ' ') colisio_lateral = 1;
+					if (win_quincar(fila, col_final) == FRNTCHAR) colisioT = 1;
 				}
 				signalS(id_sem_curses);
 			}
+		}
+
+		if (colisioT) {
+			temps_poder += TEMPS_ACUMULACIO_PODER; // Acumula segons de poder
 		}
 
 		int nova_fila = fila;
@@ -395,11 +414,11 @@ void* mou_paleta_thread(void *arg) {
         }
 
         if (nova_fila != fila || nova_col != col_actual) {
-			char simbol = '0' + paleta->id; // Convertir ID a carácter
             waitS(id_sem_curses);
             for (int c = col_actual; c < col_actual + ampl; c++) {
                 win_escricar(fila, c, ' ', NO_INV);
             }
+			char simbol = '0' + paleta->id; // Convertir ID a caràcter
             for (int c = nova_col; c < nova_col + ampl; c++) {
                 win_escricar(nova_fila, c, simbol, INVERS);
             }
@@ -420,10 +439,6 @@ void* mou_paleta_thread(void *arg) {
 	return NULL;
 }
 
-/* * Captura les entrades del teclat de l'usuari i desplaça la paleta.
- * Retorna 1 si es prem la tecla RETURN per abandonar la partida.
- */
-
 
 void actualitza_temps(void)
 {
@@ -435,12 +450,36 @@ void actualitza_temps(void)
 			segons = 0;
 			minuts++;
 		}
+
+		if (temps_poder > 0) temps_poder--;
+
+		missatge_t missatge;
+		if (poder_actiu) missatge.tipus = TIPUS_PODER_ACTIU;
+		else missatge.tipus = TIPUS_PODER_NO_ACTIU;
+
+		for (int i = 0; i < n_busties_pilotes; i++) {
+			sendM(id_busties_pilotes[i], &missatge, sizeof(missatge));
+		}
 	}
-	char temps[20];
-	sprintf(temps, "%02d:%02d", minuts, segons);
+	if (temps_poder > 0) poder_actiu = 1;
+	else poder_actiu = 0;
+
+	char temps_partida[20];
+	char temps_poder_txt[20];
+	char linea[LONGMISS];
+	sprintf(temps_partida, "%02d:%02d", minuts, segons);
+	sprintf(temps_poder_txt, "Poder: %02d", temps_poder);
+	int espais = n_col - (int)strlen(temps_partida) - (int)strlen(temps_poder_txt);
+	if (espais < 1) espais = 1;
+	/* Evitar desbordament de buffer en linea (LONGMISS). Limitar espais. */
+	int max_espais = LONGMISS - (int)strlen(temps_partida) - (int)strlen(temps_poder_txt) - 1;
+	if (max_espais < 1) max_espais = 1;
+	if (espais > max_espais) espais = max_espais;
+	sprintf(linea, "%s%*s%s", temps_partida, espais, "", temps_poder_txt);
 	waitS(id_sem_curses);
-	win_escristr(temps);
+	win_escristr(linea);
 	signalS(id_sem_curses);
+
 }
 
 static char id_pilota_visible(int id)
@@ -493,14 +532,13 @@ void processa_bustia_no_blocant(void) {
 			sprintf(nblocs_offset_s, "%d", nblocs_offset);
 			sprintf(npilotes_offset_s, "%d", npilotes_offset);
 			sprintf(final_joc_offset_s, "%d", final_joc_offset);
-
 			sprintf(id_mis_s, "%d", id_mis);
 
 			pid_pilotes[n_pilotes_processos] = fork();
 			if (pid_pilotes[n_pilotes_processos] == 0)
 			{
-				/* Execució de ./pilota2 passant id_mem, posició i velocitat per argv */
-				execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
+				/* Execució de ./pilota4 passant id_mem, posició i velocitat per argv */
+				execlp("./pilota4", "pilota4", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 				exit(1);
 			}
 			if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -511,13 +549,41 @@ void processa_bustia_no_blocant(void) {
 				n_pilotes_processos++;
 			}
 		}
+
+		if (missatge.tipus == TIPUS_INCREMENT_PODER) {
+			temps_poder += 5;
+			poder_actiu = 1;
+		}
+
+		if (missatge.tipus == TIPUS_PILOTA_SACRIFICI) {
+			/* Processar pilota de sacrifici */
+			int vel_f = missatge.vel_f;
+			int cambi_vel_f = vel_f/n_pilotes_processos; // Repartició entre les pilotes restants
+			missatge_t missatge;
+			missatge.tipus = TIPUS_PILOTA_SACRIFICI;
+			missatge.vel_f = cambi_vel_f;
+			for (int i = 0; i < n_busties_pilotes; i++) {
+				sendM(id_busties_pilotes[i], &missatge, sizeof(missatge));
+			}
+		}
+
+		/*  
+		   La pilota es crea sense id_mis_thread i quan ho processa ella, envia un missatge a mur4
+		   amb aquest id.
+		*/
+		if (missatge.tipus == TIPUS_REGISTRE_PILOTA) {
+			if (n_pilotes_processos > 0 && n_busties_pilotes < MAXBALLS) {
+				id_busties_pilotes[n_busties_pilotes] = missatge.id_bustia;
+				n_busties_pilotes++;
+			}
+		}
 	}
 }
 
 /* --- Programa Principal --- */
 int main(int n_args, char *ll_args[])
 {
-	int i, fi1= 0, fi2 = 0;
+	int i, fi1 = 0, fi2 = 0;
 	char missatge_final[50];
 	ball_id = 0;
 	FILE *fit_conf;
@@ -595,8 +661,8 @@ int main(int n_args, char *ll_args[])
 	pid_pilotes[n_pilotes_processos] = fork();
 	if (pid_pilotes[n_pilotes_processos] == 0)
 	{
-		/* Execució de ./pilota2 passant id_mem, posició i velocitat per argv */
-			execlp("./pilota2", "pilota2", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
+		/* Execució de ./pilota4 passant id_mem, posició i velocitat per argv */
+			execlp("./pilota4", "pilota4", id_mem_s, id_sem_curses_s, id_sem_memoria_s, id_mis_s, n_fil_s, n_col_s, m_por_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 		exit(1);
 	}
 	if (pid_pilotes[n_pilotes_processos] > 0) { // sumem npilotes i augmentem l'id per la seguent pilota
@@ -669,5 +735,8 @@ int main(int n_args, char *ll_args[])
 	elim_mem(id_mem);
 	elim_sem(id_sem_curses);
 	elim_sem(id_sem_memoria);
+	for (int i = 0; i < n_busties_pilotes; i++) {
+		elim_mis(id_busties_pilotes[i]);
+	}
     elim_mis(id_mis);
 }

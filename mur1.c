@@ -1,9 +1,9 @@
 /*****************************************************************************/
 /* */
 /* mur1.c                                                                    */
-/* */
-/* Programa inicial d'exemple per a les practiques 2 d'FSO.                  */
-/* Versió seqüencial adaptada a winsuport2 i memòria compartida IPC.         */
+/* */                
+/* Versió adaptada a winsuport2 i memòria compartida IPC (Fase 1).           */
+/* Gestor del joc i procés pare per a pilotes independents.                  */
 /* */
 /*****************************************************************************/
 
@@ -11,12 +11,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include "winsuport2.h"
 #include "memoria.h"
 
 /* --- Definicions de constants --- */
 #define MAX_THREADS	10
-#define MAXBALLS	(MAX_THREADS-1)
+#define MAXBALLS	50
 #define MIN_FIL	10
 #define MAX_FIL	50
 #define MIN_COL	10
@@ -42,7 +43,7 @@ char *descripcio[] = {
 	"\n",
 	"  Arguments del programa:\n",
 	"\n",
-	"       $ ./mur0 fitxer_config [retard]\n",
+	"       $ ./mur1 fitxer_config [retard]\n",
 	"\n",
 	"     El primer argument ha de ser el nom d\'un fitxer de text amb la\n",
 	"     configuracio de la partida, on la primera fila inclou informacio\n",
@@ -60,32 +61,39 @@ char *descripcio[] = {
 
 /* --- Variables Globals --- */
 /* Variables de l'entorn de joc */
-int n_fil, n_col;		/* dimensions del camp de joc */
-int m_por;			    /* mida de la porteria (en caracters) */
-int nblocs = 0;         /* nombre de blocs restants per trencar */
-int retard;			    /* valor del retard de moviment, en mil.lisegons */
-char strin[LONGMISS];	/* variable per a generar missatges de text a la pantalla */
+int n_fil, n_col;
+int m_por;
+int retard;
+char strin[LONGMISS];
 
 /* Variables de la paleta */
-int f_pal, c_pal;		/* posicio del primer caracter de la paleta (fila, columna) */
-int m_pal;              /* mida de la paleta (en caracters) */
-int dirPaleta = 0;      /* direcció de moviment de la paleta */
+int f_pal, c_pal;
+int m_pal;
+int dirPaleta = 0;
 
 /* Variables de la pilota */
-int f_pil, c_pil;		/* posicio de la pilota, en valor enter (per pintar a pantalla) */
-float pos_f, pos_c;		/* posicio real de la pilota, en valor real (per a moviments suaus) */
-float vel_f, vel_c;		/* velocitat de la pilota (components horitzontal i vertical) */
+int f_pil, c_pil;
+float pos_f, pos_c;
+float vel_f, vel_c;
+int ball_id;
 
 /* Variables globals per a la memòria compartida (IPC) */
-int id_mem;             /* identificador de la memòria compartida creada */
-void *p_mem;            /* punter cap a la zona de memòria mapejada */
+int id_mem;
+void *p_mem;
+int nblocs_offset;
+int npilotes_offset;
+int final_joc_offset;
+int *p_nblocs;
+int *p_npilotes;
+int *p_final_joc;
 
 /* Variables de temps */
 int milisegons = 0, segons = 0, minuts = 0;
 
-/* * Llegeix els paràmetres del joc des d'un fitxer de text.
- * Retorna 0 si tot va bé, o un codi d'error (1-5) si algun paràmetre és incorrecte.
- */
+/* PIDs */
+pid_t pid_pilota;
+
+/* * Llegeix els paràmetres del joc des d'un fitxer de text. */
 int carrega_configuracio(FILE * fit)
 {
 	int ret = 0;
@@ -94,7 +102,6 @@ int carrega_configuracio(FILE * fit)
 	fscanf(fit, "%d %d\n", &c_pal, &m_pal);
 	fscanf(fit, "%f %f %f %f\n", &pos_f, &pos_c, &vel_f, &vel_c);
 
-    /* Validació de les dimensions i posicions per evitar errors gràfics */
 	if ((n_fil != 0) || (n_col != 0)) {
 		if ((n_fil < MIN_FIL) || (n_fil > MAX_FIL) || (n_col < MIN_COL) || (n_col > MAX_COL))
 			ret = 1;
@@ -125,16 +132,13 @@ int carrega_configuracio(FILE * fit)
 	return (ret);
 }
 
-/* * Prepara la memòria compartida, dibuixa els elements del joc (murs, blocs,
- * paleta, pilota) i inicialitza les variables automàtiques si s'escau.
- */
+/* * Prepara la memòria compartida, dibuixa els elements del joc. */
 int inicialitza_joc(void)
 {
 	int i, mida_mem;
 	int i_port, f_port;
 	int c, nb, offset;
 
-    /* win_ini retorna la mida necessària de memòria per la configuració actual */
 	mida_mem = win_ini(&n_fil, &n_col, '+', INVERS);
 
 	if (mida_mem < 0) {
@@ -142,61 +146,74 @@ int inicialitza_joc(void)
 		return (mida_mem);
 	}
 
-    /* Creació i assignació de la memòria compartida per a la pantalla */
+	/* Reservar espai per al comptador de blocs, npilotes i bandera final */
+	nblocs_offset = mida_mem;
+	npilotes_offset = mida_mem + sizeof(int);
+	final_joc_offset = mida_mem + 2*sizeof(int);
+	mida_mem += 3 * sizeof(int);
+
+	/* Creació i assignació de la memòria compartida */
 	id_mem = ini_mem(mida_mem);
 	p_mem = map_mem(id_mem);
 	win_set(p_mem, n_fil, n_col);
 
-    /* Càlcul de la porteria inferior */
+	p_nblocs = (int *)((char *)p_mem + nblocs_offset);
+	*p_nblocs = 0;
+	p_npilotes = (int *)((char *)p_mem + npilotes_offset);
+	*p_npilotes = 0;
+	p_final_joc = (int *)((char *)p_mem + final_joc_offset);
+	*p_final_joc = 0;
+
+	/* Càlcul de la porteria inferior */
 	if (m_por > n_col - 2) m_por = n_col - 2;
 	if (m_por == 0) m_por = 3 * (n_col - 2) / 4;
 	i_port = n_col / 2 - m_por / 2 - 1;
 	f_port = i_port + m_por - 1;
 	for (i = i_port; i <= f_port; i++)
-		win_escricar(n_fil - 2, i, ' ', NO_INV);
+		win_escricar(n_fil - 2, i, ' ', 0);
 
 	n_fil = n_fil - 1;
 	f_pal = n_fil - 2;
 
-	/* Mode automàtic per a la paleta (si al fitxer s'ha passat valor 0) */
+	/* Mode automàtic per a la paleta */
 	if (m_pal == 0) m_pal = m_por / 2;
 	if (m_pal < 1) m_pal = 1;
 	if (c_pal == 0) c_pal = (n_col - m_pal) / 2;
 
-    /* Dibuixar la paleta a la pantalla */
+	/* Dibuixar la paleta */
 	for (i = 0; i < m_pal; i++)
-		win_escricar(f_pal, c_pal + i, '0', INVERS);
+		win_escricar(f_pal, c_pal + i, '0', 1);
 
-    /* Ubicar i dibuixar la pilota a la posició inicial */
+	/* Ubicar i dibuixar la pilota */
 	if (pos_f > n_fil - 1) pos_f = n_fil - 1;
 	if (pos_c > n_col - 1) pos_c = n_col - 1;
 	f_pil = pos_f;
 	c_pil = pos_c;
-	win_escricar(f_pil, c_pil, '1', INVERS);
+	win_escricar(f_pil, c_pil, '1', 1);
 
-    /* Generació dels blocs a destruir (files 3, 4 i 5) */
+	/* Generació dels blocs a destruir (files 3, 4 i 5) */
 	nb = 0;
-	nblocs = n_col / (BLKSIZE + BLKGAP) - 1;
-	offset = (n_col - nblocs * (BLKSIZE + BLKGAP) + BLKGAP) / 2;
-	for (i = 0; i < nblocs; i++) {
+	*p_nblocs = n_col / (BLKSIZE + BLKGAP) - 1;
+	offset = (n_col - *p_nblocs * (BLKSIZE + BLKGAP) + BLKGAP) / 2;
+	for (i = 0; i < *p_nblocs; i++) {
 		for (c = 0; c < BLKSIZE; c++) {
-			win_escricar(3, offset + c, FRNTCHAR, INVERS);
+			win_escricar(3, offset + c, FRNTCHAR, 1);
 			nb++;
-			win_escricar(4, offset + c, BLKCHAR, NO_INV);
+			win_escricar(4, offset + c, BLKCHAR, 0);
 			nb++;
-			win_escricar(5, offset + c, FRNTCHAR, INVERS);
+			win_escricar(5, offset + c, FRNTCHAR, 1);
 			nb++;
 		}
 		offset += BLKSIZE + BLKGAP;
 	}
-	nblocs = nb / BLKSIZE;
+	*p_nblocs = nb / BLKSIZE;
 
-    /* Generació de les defenses indestructibles (fila 6) */
+	/* Generació de les defenses indestructibles (fila 6) */
 	nb = n_col / (BLKSIZE + 2 * BLKGAP) - 2;
 	offset = (n_col - nb * (BLKSIZE + 2 * BLKGAP) + BLKGAP) / 2;
 	for (i = 0; i < nb; i++) {
 		for (c = 0; c < BLKSIZE + BLKGAP; c++) {
-			win_escricar(6, offset + c, WLLCHAR, NO_INV);
+			win_escricar(6, offset + c, WLLCHAR, 0);
 		}
 		offset += BLKSIZE + 2 * BLKGAP;
 	}
@@ -206,27 +223,27 @@ int inicialitza_joc(void)
 	return (0);
 }
 
-/* * Mostra el missatge final de partida a la línia d'estat i espera a que
- * l'usuari premi una tecla per tancar l'aplicació.
- */
+static char id_pilota_visible(int id)
+{
+	if (id < 9) return (char)('a' + id);
+	return (char)('c' + ((id - 9) % ('z' - 'c' + 1)));
+}
+
+/* * Mostra el missatge final */
 void mostra_final(char *miss)
 {
 	int lmarge;
 	char marge[LONGMISS];
 
-    /* Centra el text calculant el marge necessari */
-	lmarge=(n_col+strlen(miss))/2;
-	sprintf(marge,"%%%ds",lmarge);
-
-	sprintf(strin, marge,miss);
+	lmarge = (n_col + strlen(miss)) / 2;
+	sprintf(marge, "%%%ds", lmarge);
+	sprintf(strin, marge, miss);
 	win_escristr(strin);
 	win_update();
 	getchar();
 }
 
-/* * Captura les entrades del teclat de l'usuari i desplaça la paleta.
- * Retorna 1 si es prem la tecla RETURN per abandonar la partida.
- */
+/* * Captura les entrades del teclat i desplaça la paleta */
 int mou_paleta(void)
 {
 	int tecla, result;
@@ -235,23 +252,22 @@ int mou_paleta(void)
 	tecla = win_gettec();
 	if (tecla != 0) {
 		if ((tecla == TEC_DRETA) && ((c_pal + m_pal) < n_col - 1)) {
-                /* Esborrar l'extrem esquerre i pintar el nou extrem dret */
-				win_escricar(f_pal, c_pal, ' ', NO_INV);
-				c_pal++;
-				win_escricar(f_pal, c_pal + m_pal - 1, '0', INVERS);
+			win_escricar(f_pal, c_pal, ' ', 0);
+			c_pal++;
+			win_escricar(f_pal, c_pal + m_pal - 1, '0', 1);
 		}
 		if ((tecla == TEC_ESQUER) && (c_pal > 1)) {
-                /* Esborrar l'extrem dret i pintar el nou extrem esquerre */
-				win_escricar(f_pal, c_pal + m_pal - 1, ' ', NO_INV);
-				c_pal--;
-				win_escricar(f_pal, c_pal, '0', INVERS);
+			win_escricar(f_pal, c_pal + m_pal - 1, ' ', 0);
+			c_pal--;
+			win_escricar(f_pal, c_pal, '0', 1);
 		}
-		if (tecla == TEC_RETURN) result = 1; /* L'usuari vol sortir */
+		if (tecla == TEC_RETURN) result = 1;
 		dirPaleta = tecla;
 	}
 	return (result);
 }
 
+/* * Actualitza el temps de joc */
 void actualitza_temps(void)
 {
 	milisegons = milisegons + retard;
@@ -271,14 +287,16 @@ void actualitza_temps(void)
 /* --- Programa Principal --- */
 int main(int n_args, char *ll_args[])
 {
-	int i, fi1 = 0, fi2 = 0;
-	int ball_id = 0; // ball_id hauria de ser únic
-	char id_mem_s[20], n_fil_s[20], n_col_s[20], m_por_s[20], f_pal_s[20], c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20], vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
+	int fi1 = 0, fi2 = 0;
+	char id_mem_s[20], n_fil_s[20], n_col_s[20], m_por_s[20];
+	char c_pal_s[20], m_pal_s[20], pos_f_s[20], pos_c_s[20];
+	char vel_f_s[20], vel_c_s[20], ball_id_s[20], retard_s[20];
+	char nblocs_offset_s[20];
+	char missatge_final[50];
 	FILE *fit_conf;
 
-    /* 1. Comprovació d'arguments d'entrada */
 	if ((n_args != 2) && (n_args != 3)) {
-		i = 0;
+		int i = 0;
 		do fprintf(stderr, "%s", descripcio[i++]);
 		while (descripcio[i][0] != '*');
 		exit(1);
@@ -290,7 +308,6 @@ int main(int n_args, char *ll_args[])
 		exit(2);
 	}
 
-    /* 2. Càrrega del fitxer i configuració del retard del joc */
 	if (carrega_configuracio(fit_conf) != 0) exit(3);
 
 	if (n_args == 3) {
@@ -302,36 +319,74 @@ int main(int n_args, char *ll_args[])
 	printf("Joc del Mur: prem RETURN per continuar:\n");
 	getchar();
 
-	/* 3. Inicialització de memòria compartida i curses */
+	/* Inicialització de memòria compartida i curses */
 	if (inicialitza_joc() != 0) exit(4);
-    	sprintf(id_mem_s, "%d", id_mem);
-       	sprintf(n_fil_s, "%d", n_fil);
-       	sprintf(n_col_s, "%d", n_col);
-		sprintf(m_por_s, "%d", m_por);
-		sprintf(f_pal_s, "%d", f_pal);
-		sprintf(c_pal_s, "%d", c_pal);
-		sprintf(m_pal_s, "%d", m_pal);
-       	sprintf(pos_f_s, "%f", pos_f);
-       	sprintf(pos_c_s, "%f", pos_c);
-       	sprintf(vel_f_s, "%f", vel_f);
-       	sprintf(vel_c_s, "%f", vel_c);
-		sprintf(ball_id_s, "%d", ball_id);
-       	sprintf(retard_s, "%d", retard);
-	/* 4. Creació del procés fill per a la pilota */
-	if (fork() == 0)
-	{
-		/* Execució de ./pilota1 passant id_mem, posició i velocitat per argv */
-		execlp("./pilota1", "pilota1", id_mem_s, n_fil_s, n_col_s, m_por_s, f_pal_s, c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s, ball_id_s, retard_s, (char *)NULL);
+
+	/* Preparar i crear la primera pilota des del pare (assignar id visible) */
+	ball_id = 0;
+	char id_char = id_pilota_visible(ball_id);
+
+	sprintf(id_mem_s, "%d", id_mem);
+	sprintf(n_fil_s, "%d", n_fil);
+	sprintf(n_col_s, "%d", n_col);
+	sprintf(m_por_s, "%d", m_por);
+	sprintf(c_pal_s, "%d", c_pal);
+	sprintf(m_pal_s, "%d", m_pal);
+	sprintf(pos_f_s, "%f", pos_f);
+	sprintf(pos_c_s, "%f", pos_c);
+	sprintf(vel_f_s, "%f", vel_f);
+	sprintf(vel_c_s, "%f", vel_c);
+	sprintf(ball_id_s, "%c", id_char);
+	sprintf(retard_s, "%d", retard);
+	sprintf(nblocs_offset_s, "%d", nblocs_offset);
+	char npilotes_offset_s[20], final_joc_offset_s[20];
+	sprintf(npilotes_offset_s, "%d", npilotes_offset);
+	sprintf(final_joc_offset_s, "%d", final_joc_offset);
+
+	pid_pilota = fork();
+	if (pid_pilota == 0) {
+		execlp("./pilota1", "pilota1", id_mem_s, n_fil_s, n_col_s, m_por_s,
+			   c_pal_s, m_pal_s, pos_f_s, pos_c_s, vel_f_s, vel_c_s,
+			   ball_id_s, retard_s, nblocs_offset_s, npilotes_offset_s, final_joc_offset_s, (char *)NULL);
 		exit(1);
 	}
-	do
-	{
-		/* 5. Bucle de gestió (Pare) */
-		fi1 = mou_paleta(); actualitza_temps(); win_update(); win_retard(retard);
-	} while (!fi1 && !fi2);
-	/* Gestió del teclat */
-	/* Control de minuts:segons */
-	/* Refresc visual (propi de winsuport2) */
+	if (pid_pilota > 0) {
+		(*p_npilotes)++;
+		ball_id++;
+	}
+
+	/* Bucle de gestió (Pare) */
+	do {
+		fi1 = mou_paleta();
+		actualitza_temps();
+		win_update();
+		win_retard(retard);
+		fi2 = (*p_nblocs == 0);
+	} while (!fi1 && !fi2 && *p_npilotes > 0);
+
+	int final_per_pilotes = (*p_npilotes == 0);
+	*p_final_joc = 1;
+
+	if (fi2 == 1) {
+		sprintf(missatge_final, "Has guanyat! temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
+		printf("Has guanyat!\n");
+	} else if (!fi1 && final_per_pilotes) {
+		sprintf(missatge_final, "Has perdut! temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
+		printf("Has perdut!\n");
+	} else {
+		sprintf(missatge_final, "Partida finalitzada, temps total: %02d:%02d", minuts, segons);
+		mostra_final(missatge_final);
+	}
+
+	while (wait(NULL) > 0) {
+		/* Esperem la finalització natural dels fills */
+	}
+
+	/* Neteja de recursos */
 	win_fi();
 	elim_mem(id_mem);
+
+	return (0);
 }
