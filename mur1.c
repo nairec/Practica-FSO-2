@@ -226,7 +226,7 @@ int inicialitza_joc(void)
 static char id_pilota_visible(int id)
 {
 	if (id < 9) return (char)('a' + id);
-	return (char)('c' + ((id - 9) % ('z' - 'c' + 1)));
+	return (char)('a' + ((id - 9) % ('z' - 'a' + 1)));
 }
 
 /* * Mostra el missatge final */

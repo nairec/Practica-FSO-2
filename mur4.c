@@ -203,6 +203,28 @@ int inicialitza_joc(void)
 	int i_port, f_port;
 	int c, nb, offset;
 
+	/* Si no s'han definit paletes amb línies P, crear la paleta per defecte
+	ara que ja tenim les dimensions i la mida de la porteria (params_auto). */
+	if (n_paletes == 0) {
+		if (m_pal == 0) m_pal = m_por / 2;
+		if (m_pal < 1) m_pal = 1;
+		if (c_pal == 0) c_pal = (n_col - m_pal) / 2;
+		paletes[0].fila = (n_fil > 2) ? (n_fil - 2) : 1;
+		paletes[0].col_inicial = c_pal;
+		paletes[0].col_actual = c_pal;  // Inicialitzar col_actual
+		paletes[0].amplada = m_pal;
+		paletes[0].dir_lateral = 1;
+		paletes[0].dir_vertical = -1;
+		paletes[0].salt_vertical = 0;
+		paletes[0].id = 1;
+		n_paletes = 1;
+	
+		if (m_pal < 1 || m_pal > n_col - 3 || c_pal < 1 || c_pal + m_pal > n_col - 1) {
+			fprintf(stderr, "Error en la configuracio automatica de la paleta: mida o posicio incorrectes\n");
+			return (6);
+		}
+	}
+
     /* win_ini retorna la mida necessària de memòria per la configuració actual */
 	mida_mem = win_ini(&n_fil, &n_col, '+', INVERS);
 
@@ -244,22 +266,6 @@ int inicialitza_joc(void)
 
 	
 	/* Ubicar i dibuixar les paletes */
-	/* Si no s'han definit paletes amb línies P, crear la paleta per defecte
-	   ara que ja tenim les dimensions i la mida de la porteria (params_auto). */
-	if (n_paletes == 0) {
-		if (m_pal == 0) m_pal = m_por / 2;
-		if (m_pal < 1) m_pal = 1;
-		if (c_pal == 0) c_pal = (n_col - m_pal) / 2;
-		paletes[0].fila = (n_fil > 2) ? (n_fil - 2) : 1;
-		paletes[0].col_inicial = c_pal;
-		paletes[0].col_actual = c_pal;
-		paletes[0].amplada = m_pal;
-		paletes[0].dir_lateral = 1;
-		paletes[0].dir_vertical = -1;
-		paletes[0].salt_vertical = 0;
-		paletes[0].id = 1;
-		n_paletes = 1;
-	}
 	for (int p = 0; p < n_paletes; p++) {
 		char simbol = '0' + paletes[p].id; // Convertir ID a caràcter
 		for (int i = 0; i < paletes[p].amplada; i++) {
@@ -485,8 +491,8 @@ void actualitza_temps(void)
 static char id_pilota_visible(int id)
 {
 	/* Evitem '0', 'A' i 'B' perquè tenen significat especial al taulell */
-	if (id < 9) return (char)('1' + id);
-	return (char)('C' + ((id - 9) % ('Z' - 'C' + 1)));
+	if (id < 9) return (char)('a' + id);
+	return (char)('a' + ((id - 9) % ('z' - 'a' + 1)));
 }
 
 void processa_bustia_no_blocant(void) {

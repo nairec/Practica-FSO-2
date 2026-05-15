@@ -446,8 +446,8 @@ void actualitza_temps(void)
 static char id_pilota_visible(int id)
 {
 	/* Evitem '0', 'A' i 'B' perquè tenen significat especial al taulell */
-	if (id < 9) return (char)('1' + id);
-	return (char)('C' + ((id - 9) % ('Z' - 'C' + 1)));
+	if (id < 9) return (char)('a' + id);
+	return (char)('a' + ((id - 9) % ('z' - 'a' + 1)));
 }
 
 void processa_bustia_no_blocant(void) {
